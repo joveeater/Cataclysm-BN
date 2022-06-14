@@ -427,6 +427,26 @@ dealt_projectile_attack projectile_attack( const projectile &proj_arg, const tri
         } else if( in_veh != nullptr && veh_pointer_or_null( g->m.veh_at( tp ) ) == in_veh ) {
             // Don't do anything, especially don't call map::shoot as this would damage the vehicle
         } else {
+
+            if( g->m.obstructed_by_vehicle_rotation( prev_point, tp ) ) {
+                //We're firing through an impassible gap in a rotated vehicle, randomly hit one of the two walls
+                tripoint rand = tp;
+                if( one_in( 2 ) ) {
+                    rand.x = prev_point.x;
+                } else {
+                    rand.y = prev_point.y;
+                }
+                if( in_veh == nullptr || veh_pointer_or_null( g->m.veh_at( rand ) ) != in_veh ) {
+                    g->m.shoot( rand, proj, false );
+                    if( proj.impact.total_damage() <= 0 ) {
+                        //If the projectile stops here move it back a square so it doesn't end up inside the vehicle
+                        traj_len = i - 1;
+                        tp = prev_point;
+                        break;
+                    }
+                }
+            }
+
             g->m.shoot( tp, proj, !no_item_damage && tp == target );
             has_momentum = proj.impact.total_damage() > 0;
         }

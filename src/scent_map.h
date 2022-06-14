@@ -53,6 +53,12 @@ class scent_map
         const game &gm;
 
     public:
+
+        struct scent_properties {
+            bool block;
+            bool reduce;
+        };
+
         scent_map( const game &g ) : gm( g ) { }
 
         void deserialize( const std::string &data, bool is_type = false );

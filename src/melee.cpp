@@ -639,6 +639,7 @@ void player::reach_attack( const tripoint &p )
     int skill = std::min( 10, get_skill_level( skill_stabbing ) );
     int t = 0;
     std::vector<tripoint> path = line_to( pos(), p, t, 0 );
+    tripoint last_point = path.back();
     path.pop_back(); // Last point is our critter
     for( const tripoint &path_point : path ) {
         // Possibly hit some unintended target instead
@@ -652,6 +653,18 @@ void player::reach_attack( const tripoint &p )
             critter = inter;
             break;
             /** @EFFECT_STABBING increases ability to reach attack through fences */
+        } else if( g->m.obstructed_by_vehicle_rotation( last_point, path_point ) ) {
+            tripoint rand = path_point;
+            if( one_in( 2 ) ) {
+                rand.x = last_point.x;
+            } else {
+                rand.y = last_point.y;
+            }
+
+            g->m.bash( rand, str_cur + weapon.damage_melee( DT_BASH ) );
+            handle_melee_wear( weapon );
+            mod_moves( -move_cost );
+            return;
         } else if( g->m.impassable( path_point ) &&
                    // Fences etc. Spears can stab through those
                    !( weapon.has_flag( "SPEAR" ) &&
@@ -663,6 +676,7 @@ void player::reach_attack( const tripoint &p )
             mod_moves( -move_cost );
             return;
         }
+        last_point = path_point;
     }
 
     if( critter == nullptr ) {

@@ -693,7 +693,11 @@ action_id handle_action_menu()
     // display that action at the top of the list.
     for( const tripoint &pos : g->m.points_in_radius( g->u.pos(), 1 ) ) {
         if( pos != g->u.pos() ) {
-            // Check for actions that work on nearby tiles
+            // Check for actions that work on nearby tiles, skipping tiles blocked by vehicles
+            if( g->m.obstructed_by_vehicle_rotation( g->u.pos(), pos ) ) {
+                continue;
+            }
+
             if( can_interact_at( ACTION_OPEN, pos ) ) {
                 action_weightings[ACTION_OPEN] = 200;
             }
@@ -1006,7 +1010,17 @@ cata::optional<tripoint> choose_direction( const std::string &message, const boo
 cata::optional<tripoint> choose_adjacent( const std::string &message, const bool allow_vertical )
 {
     const cata::optional<tripoint> dir = choose_direction( message, allow_vertical );
-    return dir ? *dir + g->u.pos() : dir;
+
+    if( !dir ) {
+        return cata::nullopt;
+    }
+
+    if( g->m.obstructed_by_vehicle_rotation( g->u.pos(), *dir + g->u.pos() ) ) {
+        add_msg( _( "You can't reach through that vehicle's wall." ) );
+        return cata::nullopt;
+    }
+
+    return *dir + g->u.pos();
 }
 
 cata::optional<tripoint> choose_adjacent_highlight( const std::string &message,
@@ -1025,7 +1039,7 @@ cata::optional<tripoint> choose_adjacent_highlight( const std::string &message,
     std::vector<tripoint> valid;
     if( allowed ) {
         for( const tripoint &pos : g->m.points_in_radius( g->u.pos(), 1 ) ) {
-            if( allowed( pos ) ) {
+            if( !g->m.obstructed_by_vehicle_rotation( g->u.pos(), pos ) && allowed( pos ) ) {
                 valid.emplace_back( pos );
             }
         }
