@@ -1066,9 +1066,6 @@ class vehicle
         // Translate mount coordinates "p" into tile coordinates "q" using given pivot direction and anchor
         void coord_translate( units::angle dir, const point &pivot, const point &p,
                               tripoint &q ) const;
-        // Translate mount coordinates "p" into tile coordinates "q" using given tileray and anchor
-        // should be faster than previous call for repeated translations
-        void coord_translate( tileray tdir, const point &pivot, const point &p, tripoint &q ) const;
 
         tripoint mount_to_tripoint( const point &mount ) const;
         tripoint mount_to_tripoint( const point &mount, const point &offset ) const;

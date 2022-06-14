@@ -2991,21 +2991,64 @@ point vehicle::coord_translate( const point &p ) const
     return q.xy();
 }
 
+const struct {
+    float gradient;
+    bool flipX;
+    bool flipY;
+    bool swapXY;
+} rotation_info[24] = {
+    {static_cast<float>( tan( units::to_radians( 0_degrees ) ) ),  false, false,   false}, //0 degrees
+    {static_cast<float>( tan( units::to_radians( 15_degrees ) ) ), false, false,   false},
+    {static_cast<float>( tan( units::to_radians( 30_degrees ) ) ), false, false,   false},
+    {static_cast<float>( -tan( units::to_radians( 45_degrees ) ) ), true,  false, true}, //45 degrees
+    {static_cast<float>( -tan( units::to_radians( 30_degrees ) ) ), true,  false, true},
+    {static_cast<float>( -tan( units::to_radians( 15_degrees ) ) ), true,  false, true},
+    {static_cast<float>( tan( units::to_radians( 0_degrees ) ) ),  true,  false,   true}, //90 degrees
+    {static_cast<float>( tan( units::to_radians( 15_degrees ) ) ), true,  false,   true},
+    {static_cast<float>( tan( units::to_radians( 30_degrees ) ) ), true,  false,   true},
+    {static_cast<float>( tan( units::to_radians( 45_degrees ) ) ), true,  false,   true}, //135 degrees
+    {static_cast<float>( -tan( units::to_radians( 30_degrees ) ) ), true,  true,  false},
+    {static_cast<float>( -tan( units::to_radians( 15_degrees ) ) ), true,  true,  false},
+    {static_cast<float>( tan( units::to_radians( 0_degrees ) ) ),  true,  true,    false}, //180 degrees
+    {static_cast<float>( tan( units::to_radians( 15_degrees ) ) ), true,  true,    false},
+    {static_cast<float>( tan( units::to_radians( 30_degrees ) ) ), true,  true,    false},
+    {static_cast<float>( -tan( units::to_radians( 45_degrees ) ) ), false, true,  true}, //225 degrees
+    {static_cast<float>( -tan( units::to_radians( 30_degrees ) ) ), false, true,  true},
+    {static_cast<float>( -tan( units::to_radians( 15_degrees ) ) ), false, true,  true},
+    {static_cast<float>( tan( units::to_radians( 0_degrees ) ) ),  false,  true,   true}, //270 degrees
+    {static_cast<float>( tan( units::to_radians( 15_degrees ) ) ), false,  true,   true},
+    {static_cast<float>( tan( units::to_radians( 30_degrees ) ) ), false,  true,   true},
+    {static_cast<float>( tan( units::to_radians( 45_degrees ) ) ), false,  true,   true}, //315 degrees
+    {static_cast<float>( -tan( units::to_radians( 30_degrees ) ) ), false,  false, false},
+    {static_cast<float>( -tan( units::to_radians( 15_degrees ) ) ), false,  false, false},
+};
+
 void vehicle::coord_translate( units::angle dir, const point &pivot, const point &p,
                                tripoint &q ) const
 {
-    tileray tdir( dir );
-    tdir.advance( p.x - pivot.x );
-    q.x = tdir.dx() + tdir.ortho_dx( p.y - pivot.y );
-    q.y = tdir.dy() + tdir.ortho_dy( p.y - pivot.y );
-}
+    point relative = p - pivot;
 
-void vehicle::coord_translate( tileray tdir, const point &pivot, const point &p, tripoint &q ) const
-{
-    tdir.clear_advance();
-    tdir.advance( p.x - pivot.x );
-    q.x = tdir.dx() + tdir.ortho_dx( p.y - pivot.y );
-    q.y = tdir.dy() + tdir.ortho_dy( p.y - pivot.y );
+    int increment = ( std::lround( to_degrees( dir ) ) % 360 ) / 15;
+    if( increment < 0 ) {
+        increment += 360 / 15;
+    }
+
+    float skew = std::trunc( relative.x * rotation_info[increment].gradient );
+
+    q.x = relative.x;
+    q.y = relative.y + skew;
+
+    if( rotation_info[increment].swapXY ) {
+        auto swap = q.x;
+        q.x = q.y;
+        q.y = swap;
+    }
+    if( rotation_info[increment].flipX ) {
+        q.x = -q.x;
+    }
+    if( rotation_info[increment].flipY ) {
+        q.y = -q.y;
+    }
 }
 
 tripoint vehicle::mount_to_tripoint( const point &mount ) const
@@ -3025,7 +3068,7 @@ void vehicle::precalc_mounts( int idir, units::angle dir, const point &pivot )
     if( idir < 0 || idir > 1 ) {
         idir = 0;
     }
-    tileray tdir( dir );
+
     std::unordered_map<point, tripoint> mount_to_precalc;
     for( auto &p : parts ) {
         if( p.removed ) {
@@ -3033,7 +3076,7 @@ void vehicle::precalc_mounts( int idir, units::angle dir, const point &pivot )
         }
         auto q = mount_to_precalc.find( p.mount );
         if( q == mount_to_precalc.end() ) {
-            coord_translate( tdir, pivot, p.mount, p.precalc[idir] );
+            coord_translate( dir, pivot, p.mount, p.precalc[idir] );
             mount_to_precalc.insert( { p.mount, p.precalc[idir] } );
         } else {
             p.precalc[idir] = q->second;
