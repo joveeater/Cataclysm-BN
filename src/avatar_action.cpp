@@ -588,7 +588,12 @@ void avatar_action::autoattack( avatar &you, map &m )
 {
     int reach = you.weapon.reach_range( you );
     std::vector<Creature *> critters = ranged::targetable_creatures( you, reach );
-    critters.erase( std::remove_if( critters.begin(), critters.end(), []( const Creature * c ) {
+    critters.erase( std::remove_if( critters.begin(), critters.end(), [&you]( const Creature * c ) {
+        //If attacking across z levels it must be 1 tile directly above or below you
+        if( ( c->pos().z != you.pos().z && c->pos().xy() != you.pos().xy() ) ||
+            abs( c->pos().z - you.pos().z ) > 1 ) {
+            return true;
+        }
         if( !c->is_npc() ) {
             return false;
         }

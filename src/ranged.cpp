@@ -197,6 +197,8 @@ class target_ui
         bool no_fail = false;
         // Spell does not require mana
         bool no_mana = false;
+        // Can only target directly above or below when going across z levels
+        bool only_directly_above = false;
         // Relevant activity
         aim_activity_actor *activity = nullptr;
         // Generator of AoE shapes
@@ -446,6 +448,7 @@ target_handler::trajectory target_handler::mode_reach( avatar &you, item &weapon
     ui.mode = target_ui::TargetMode::Reach;
     ui.relevant = &weapon;
     ui.range = weapon.reach_range( you );
+    ui.only_directly_above = true;
 
     return ui.run();
 }
@@ -2547,9 +2550,16 @@ bool target_ui::set_cursor_pos( const tripoint &new_pos )
     if( new_pos != src ) {
         // On Z axis, make sure we do not exceed map boundaries
         valid_pos.z = clamp( valid_pos.z, -OVERMAP_DEPTH, OVERMAP_HEIGHT );
-        // Or current view range
-        valid_pos.z = clamp( valid_pos.z - src.z, -fov_3d_z_range, fov_3d_z_range ) + src.z;
 
+        if( valid_pos.z != src.z ) {
+            if( only_directly_above ) {
+                valid_pos.z = clamp( valid_pos.z - src.z, -1, 1 ) + src.z;
+                valid_pos.x = src.x;
+                valid_pos.y = src.y;
+            } else {
+                valid_pos.z = clamp( valid_pos.z - src.z, -fov_3d_z_range, fov_3d_z_range ) + src.z;
+            }
+        }
         new_traj = here.find_clear_path( src, valid_pos );
         if( range == 1 ) {
             // We should always be able to hit adjacent squares

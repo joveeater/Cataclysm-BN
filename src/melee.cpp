@@ -627,6 +627,12 @@ void player::reach_attack( const tripoint &p )
         force_technique = matec_id( "WHIP_DISARM" );
     }
 
+    if( ( p.z != pos().z && p.xy() != pos().xy() ) || abs( p.z - pos().z ) > 1 ) {
+        //If attacking across z levels it has to be directly above/below
+        //It shouldn't be possible to input this action
+        return;
+    }
+
     map &here = get_map();
     Creature *critter = g->critter_at( p );
     // Original target size, used when there are monsters in front of our target

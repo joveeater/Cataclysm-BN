@@ -1454,9 +1454,9 @@ bool monster::attack_at( const tripoint &p )
     if( has_flag( MF_PACIFIST ) ) {
         return false;
     }
-    if( p.z != posz() ) {
-        // TODO: Remove this
-        return false;
+    //Can only attack 1 tile directly up and down
+    if( p.z != posz() && (abs(p.z-posz()) > 1 || p.xy()!=pos().xy()) ) {
+		return false;
     }
 
     if( p == g->u.pos() ) {
