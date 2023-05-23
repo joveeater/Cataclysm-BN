@@ -16,7 +16,7 @@
 template<int sx, int sy>
 void maptile_soa<sx, sy>::swap_soa_tile( point p1, point p2 )
 {
-    tripoint offset = tripoint( p2 - p1, 0 );
+    tripoint offset = tripoint( p1 - p2, 0 );
 
     itm[p1.x][p1.y].move_by( offset );
     itm[p2.x][p2.y].move_by( -offset );
@@ -50,8 +50,11 @@ void submap::swap( submap &first, submap &second, tripoint offset )
         }
     }
 
-    std::swap( first.itm, second.itm );
-
+    for( int x = 0; x < SEEX; x++ ) {
+        for( int y = 0; y < SEEX; y++ ) {
+            std::swap( first.itm[x][y], second.itm[x][y] );
+        }
+    }
 }
 
 //There's not a briefer way to write this I don't think
