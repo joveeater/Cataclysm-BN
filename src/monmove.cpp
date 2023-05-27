@@ -1491,7 +1491,7 @@ bool monster::attack_at( const tripoint &p )
     if( has_flag( MF_PACIFIST ) ) {
         return false;
     }
-    if( p.z != posz() && !get_map().valid_move( pos(), p, false, true, false ) ) {
+    if( p.z != posz() && ( !fov_3d || !get_map().valid_move( pos(), p, false, true, false ) ) ) {
         return false;
     }
 
