@@ -63,7 +63,8 @@ def copy_and_rewrite(file):
             dependencies.append(library)
     copied_file = file
     if file != executable:
-        copied_file = shutil.copy2(file, executable_dir)
+        os.symlink(file, executable_dir)
+        copied_file = executable_dir+"/"+file
         print("Copied {} to {}".format(file, copied_file))
     for dependency in dependencies:
         if dependency == file:

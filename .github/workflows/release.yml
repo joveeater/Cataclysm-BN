@@ -3,7 +3,7 @@ concurrency: release
 on:
   push:
     branches:
-      - upload
+      - test-osx
 
 env:
   VCPKG_BINARY_SOURCES: "default"
