@@ -63,7 +63,7 @@ def copy_and_rewrite(file):
             dependencies.append(library)
     copied_file = file
     if file != executable:
-        copied_file = executable_dir+"/"+file
+        copied_file = executable_dir+"/"+os.path.basename(file)
         if os.access(copied_file, os.R_OK):
             os.symlink(file, executable_dir)
             print("Symlinked {} to {}".format(copied_file, file))
