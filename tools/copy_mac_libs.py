@@ -19,21 +19,27 @@ def is_homebrew_library(library):
 
 
 def rewrite_identity(object):
+    shutil.chown(object, os.getuid())
     st = os.stat(object)
+    os.chmod(object, st.st_mode | stat.S_IWUSR)
     id = "@executable_path/{}".format(os.path.basename(object))
     ret = subprocess.run(["install_name_tool", "-id", id, object])
     if ret.returncode != 0:
         print("Error:", ret.stderr.decode('utf-8'))
+    os.chmod(object, (st.st_mode | stat.S_IWUSR) ^ stat.S_IWUSR)
     print("Rewritten identity of {}".format(object))
 
 
 def rewrite_dependency(object, dependency):
+    shutil.chown(object, os.getuid())
     st = os.stat(object)
+    os.chmod(object, st.st_mode | stat.S_IWUSR)
     dest = "@executable_path/{}".format(os.path.basename(dependency))
     ret = subprocess.run(["install_name_tool", "-change", dependency,
                           dest, object])
     if ret.returncode != 0:
         print("Error:", ret.stderr.decode('utf-8'))
+    os.chmod(object, (st.st_mode | stat.S_IWUSR) ^ stat.S_IWUSR)
     print("Rewritten reference from {} to {}".format(dependency, dest))
 
 
@@ -57,10 +63,8 @@ def copy_and_rewrite(file):
             dependencies.append(library)
     copied_file = file
     if file != executable:
-        copied_file = executable_dir+"/"+os.path.basename(file)
-        if os.access(copied_file, os.R_OK):
-            os.symlink(file, executable_dir)
-            print("Symlinked {} to {}".format(copied_file, file))
+        copied_file = shutil.copy2(file, executable_dir)
+        print("Copied {} to {}".format(file, copied_file))
     for dependency in dependencies:
         if dependency == file:
             rewrite_identity(copied_file)
