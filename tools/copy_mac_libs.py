@@ -26,7 +26,6 @@ def rewrite_identity(object):
     ret = subprocess.run(["install_name_tool", "-id", id, object])
     if ret.returncode != 0:
         print("Error:", ret.stderr.decode('utf-8'))
-    os.chmod(object, (st.st_mode | stat.S_IWUSR) ^ stat.S_IWUSR)
     print("Rewritten identity of {}".format(object))
 
 
@@ -39,7 +38,6 @@ def rewrite_dependency(object, dependency):
                           dest, object])
     if ret.returncode != 0:
         print("Error:", ret.stderr.decode('utf-8'))
-    os.chmod(object, (st.st_mode | stat.S_IWUSR) ^ stat.S_IWUSR)
     print("Rewritten reference from {} to {}".format(dependency, dest))
 
 
