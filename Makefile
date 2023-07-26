@@ -1057,31 +1057,31 @@ endif
 	cp $(APPTARGET) $(APPRESOURCESDIR)/
 	cp build-data/osx/AppIcon.icns $(APPRESOURCESDIR)/
 	mkdir -p $(APPDATADIR)
-	cp -R data/font $(APPDATADIR)
-	cp -R data/json $(APPDATADIR)
-	cp -R data/mods $(APPDATADIR)
-	cp -R data/names $(APPDATADIR)
-	cp -R data/raw $(APPDATADIR)
-	cp -R data/motd $(APPDATADIR)
-	cp -R data/credits $(APPDATADIR)
-	cp -R data/title $(APPDATADIR)
-	cp -R data/help $(APPDATADIR)
+	ln -s data/font $(APPDATADIR)
+	ln -s data/json $(APPDATADIR)
+	ln -s data/mods $(APPDATADIR)
+	ln -s data/names $(APPDATADIR)
+	ln -s data/raw $(APPDATADIR)
+	ln -s data/motd $(APPDATADIR)
+	ln -s data/credits $(APPDATADIR)
+	ln -s data/title $(APPDATADIR)
+	ln -s data/help $(APPDATADIR)
 ifdef LANGUAGES
 	lang/compile_mo.sh $(LANGUAGES)
 	mkdir -p $(APPRESOURCESDIR)/lang/mo/
-	cp -pR lang/mo/* $(APPRESOURCESDIR)/lang/mo/
+	ln -s lang/ $(APPRESOURCESDIR)/lang/
 endif
 ifeq ($(TILES), 1)
 ifeq ($(SOUND), 1)
-	cp -R data/sound $(APPDATADIR)
+	ln -s data/sound $(APPDATADIR)
 endif  # ifdef SOUND
-	cp -R gfx $(APPRESOURCESDIR)/
+	ln -s gfx $(APPRESOURCESDIR)/
 ifdef FRAMEWORK
-	cp -R $(FRAMEWORKSDIR)/SDL2.framework $(APPRESOURCESDIR)/
-	cp -R $(FRAMEWORKSDIR)/SDL2_image.framework $(APPRESOURCESDIR)/
-	cp -R $(FRAMEWORKSDIR)/SDL2_ttf.framework $(APPRESOURCESDIR)/
+	ln -s $(FRAMEWORKSDIR)/SDL2.framework $(APPRESOURCESDIR)/
+	ln -s $(FRAMEWORKSDIR)/SDL2_image.framework $(APPRESOURCESDIR)/
+	ln -s $(FRAMEWORKSDIR)/SDL2_ttf.framework $(APPRESOURCESDIR)/
 ifeq ($(SOUND), 1)
-	cp -R $(FRAMEWORKSDIR)/SDL2_mixer.framework $(APPRESOURCESDIR)/
+	ln -s $(FRAMEWORKSDIR)/SDL2_mixer.framework $(APPRESOURCESDIR)/
 	cd $(APPRESOURCESDIR)/ && ln -s SDL2_mixer.framework/Frameworks/Vorbis.framework Vorbis.framework
 	cd $(APPRESOURCESDIR)/ && ln -s SDL2_mixer.framework/Frameworks/Ogg.framework Ogg.framework
 	cd $(APPRESOURCESDIR)/SDL2_mixer.framework/Frameworks && find . -maxdepth 1 -type d -not -name '*Vorbis.framework' -not -name '*Ogg.framework' -not -name '.' | xargs rm -rf
