@@ -19,9 +19,7 @@ def is_homebrew_library(library):
 
 
 def rewrite_identity(object):
-    shutil.chown(object, os.getuid())
     st = os.stat(object)
-    os.chmod(object, st.st_mode | stat.S_IWUSR)
     id = "@executable_path/{}".format(os.path.basename(object))
     ret = subprocess.run(["install_name_tool", "-id", id, object])
     if ret.returncode != 0:
@@ -30,9 +28,7 @@ def rewrite_identity(object):
 
 
 def rewrite_dependency(object, dependency):
-    shutil.chown(object, os.getuid())
     st = os.stat(object)
-    os.chmod(object, st.st_mode | stat.S_IWUSR)
     dest = "@executable_path/{}".format(os.path.basename(dependency))
     ret = subprocess.run(["install_name_tool", "-change", dependency,
                           dest, object])
