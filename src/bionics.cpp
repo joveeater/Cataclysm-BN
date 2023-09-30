@@ -198,7 +198,6 @@ static const std::string flag_PERSONAL( "PERSONAL" );
 static const std::string flag_SAFE_FUEL_OFF( "SAFE_FUEL_OFF" );
 static const std::string flag_SEALED( "SEALED" );
 static const std::string flag_SEMITANGIBLE( "SEMITANGIBLE" );
-static const std::string flag_SPLINT( "SPLINT" );
 
 static const flag_str_id flag_BIONIC_FAULTY( "BIONIC_FAULTY" );
 static const flag_str_id flag_BIONIC_GUN( "BIONIC_GUN" );
@@ -466,9 +465,9 @@ void deactivate_weapon_cbm( npc &who )
     for( bionic &i : *who.my_bionics ) {
         if( i.powered && i.info().has_flag( flag_BIONIC_WEAPON ) ) {
             who.deactivate_bionic( i );
+            who.clear_npc_ai_info_cache( npc_ai_info::ideal_weapon_value );
         }
     }
-    who.clear_npc_ai_info_cache( npc_ai_info::ideal_weapon_value );
 }
 
 std::vector<std::pair<bionic_id, item *>> find_reloadable_cbms( npc &who )
@@ -1672,6 +1671,12 @@ void Character::process_bionic( bionic &bio )
             }
             if( calendar::once_every( 2_minutes ) ) {
                 std::vector<bodypart_id> damaged_hp_parts;
+                for( const bodypart_id &bp : get_all_body_parts( true ) ) {
+                    const int hp_cur = get_part_hp_cur( bp );
+                    if( !is_limb_broken( bp ) && hp_cur < get_part_hp_max( bp ) ) {
+                        damaged_hp_parts.push_back( bp );
+                    }
+                }
                 if( !damaged_hp_parts.empty() ) {
                     // Essential parts are considered 10 HP lower than non-essential parts for the purpose of determining priority.
                     // I'd use the essential_value, but it's tied up in the heal_actor class of iuse_actor.

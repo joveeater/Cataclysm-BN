@@ -81,13 +81,11 @@ static const efftype_id effect_asthma( "asthma" );
 static const efftype_id effect_attention( "attention" );
 static const efftype_id effect_bleed( "bleed" );
 static const efftype_id effect_blind( "blind" );
-static const efftype_id effect_cig( "cig" );
 static const efftype_id effect_cough_aggravated_asthma( "cough_aggravated_asthma" );
 static const efftype_id effect_datura( "datura" );
 static const efftype_id effect_deaf( "deaf" );
 static const efftype_id effect_disabled( "disabled" );
 static const efftype_id effect_downed( "downed" );
-static const efftype_id effect_drunk( "drunk" );
 static const efftype_id effect_feral_killed_recently( "feral_killed_recently" );
 static const efftype_id effect_formication( "formication" );
 static const efftype_id effect_glowy_led( "glowy_led" );
@@ -169,7 +167,6 @@ static const mtype_id mon_zombie_soldier( "mon_zombie_soldier" );
 static const std::string flag_BLIND( "BLIND" );
 static const std::string flag_PLOWABLE( "PLOWABLE" );
 static const std::string flag_RAD_RESIST( "RAD_RESIST" );
-static const std::string flag_SPLINT( "SPLINT" );
 static const std::string flag_SUN_GLASSES( "SUN_GLASSES" );
 
 void Character::suffer_water_damage( const mutation_branch &mdata )
@@ -253,7 +250,12 @@ void Character::suffer_while_underwater()
             mod_power_level( -bio_gills->power_trigger );
         } else {
             add_msg_if_player( m_bad, _( "You're drowning!" ) );
-            apply_damage( nullptr, bodypart_id( "torso" ), rng( 1, 4 ) );
+            // NPCs are not currently programmed to avoid or get out of deep water,
+            // so disable drowning damage for them.
+            // https://github.com/cataclysmbnteam/Cataclysm-BN/issues/3266
+            if( !is_npc() ) {
+                apply_damage( nullptr, bodypart_id( "torso" ), rng( 1, 4 ) );
+            }
         }
     }
     if( has_trait( trait_FRESHWATEROSMOSIS ) && !get_map().has_flag_ter( "SALT_WATER", pos() ) &&
@@ -795,39 +797,41 @@ void Character::suffer_feral_kill_withdrawl()
 
 void Character::suffer_in_sunlight()
 {
-    double sleeve_factor = armwear_factor();
-    const bool has_hat = wearing_something_on( bodypart_id( "head" ) );
-    const bool leafy = has_trait( trait_LEAVES ) || has_trait( trait_LEAVES2 ) ||
+    if( !g->is_in_sunlight( pos() ) ) {
+        return;
+    }
+
+    const bool leafy = has_trait( trait_LEAVES ) ||
+                       has_trait( trait_LEAVES2 ) ||
                        has_trait( trait_LEAVES3 );
-    const bool leafier = has_trait( trait_LEAVES2 ) || has_trait( trait_LEAVES3 );
-    const bool leafiest = has_trait( trait_LEAVES3 );
-    int sunlight_nutrition = 0;
-    if( leafy && get_map().is_outside( pos() ) && ( g->light_level( pos().z ) >= 40 ) ) {
+
+    if( leafy ) {
+        const bool leafier = has_trait( trait_LEAVES2 ) || has_trait( trait_LEAVES3 );
+        const bool leafiest = has_trait( trait_LEAVES3 );
+        double sleeve_factor = armwear_factor();
+        const bool has_hat = wearing_something_on( bodypart_id( "head" ) );
         const float weather_factor = ( get_weather().weather_id->sun_intensity >=
                                        sun_intensity_type::normal ) ? 1.0 : 0.5;
         const int player_local_temp = get_weather().get_temperature( pos() );
-        int flux = ( player_local_temp - 65 ) / 2;
+        const int flux = ( player_local_temp - 65 ) / 2;
+
+        int sunlight_nutrition = 0;
         if( !has_hat ) {
             sunlight_nutrition += ( 100 + flux ) * weather_factor;
         }
-        if( leafier ) {
-            int rate = ( ( 100 * sleeve_factor ) + flux ) * 2;
+        if( leafier || leafiest ) {
+            const int rate = ( ( 100 * sleeve_factor ) + flux ) * 2;
             sunlight_nutrition += ( rate * ( leafiest ? 2 : 1 ) ) * weather_factor;
         }
-    }
+        if( x_in_y( sunlight_nutrition, 18000 ) ) {
+            vitamin_mod( vitamin_id( "vitA" ), 1, true );
+            vitamin_mod( vitamin_id( "vitC" ), 1, true );
+        }
 
-    if( x_in_y( sunlight_nutrition, 18000 ) ) {
-        vitamin_mod( vitamin_id( "vitA" ), 1, true );
-        vitamin_mod( vitamin_id( "vitC" ), 1, true );
-    }
-
-    if( x_in_y( sunlight_nutrition, 12000 ) ) {
-        mod_stored_kcal( 10 );
-        stomach.ate();
-    }
-
-    if( !g->is_in_sunlight( pos() ) ) {
-        return;
+        if( x_in_y( sunlight_nutrition, 12000 ) ) {
+            mod_stored_kcal( 10 );
+            stomach.ate();
+        }
     }
 
     if( has_trait( trait_ALBINO ) || has_effect( effect_datura ) || has_trait( trait_SUNBURN ) ) {

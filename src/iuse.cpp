@@ -2392,6 +2392,8 @@ int iuse::hammer( player *p, item *it, bool, const tripoint & )
     }
     const std::set<ter_id> allowed_ter_id {
         t_fence,
+        t_window_reinforced,
+        t_window_reinforced_noglass,
         t_window_boarded,
         t_window_boarded_noglass,
         t_door_boarded,
@@ -2430,6 +2432,7 @@ int iuse::hammer( player *p, item *it, bool, const tripoint & )
     }
 
     if( type == t_fence || type == t_window_boarded || type == t_window_boarded_noglass ||
+        type == t_window_reinforced || type == t_window_reinforced_noglass ||
         type == t_door_boarded || type == t_door_boarded_damaged ||
         type == t_rdoor_boarded || type == t_rdoor_boarded_damaged ||
         type == t_door_boarded_peep || type == t_door_boarded_damaged_peep ) {
@@ -2641,7 +2644,7 @@ static digging_moves_and_byproducts dig_pit_moves_and_byproducts( player *p, ite
     ///\EFFECT_STR modifies dig rate
     // Adjust the dig rate if the player is above or below strength of 10.
     // Floor it at 1 so we don't divide by zero, of course!
-    const double attr = 10 / std::max( 1, p->str_cur );
+    const double attr = 10.0 / std::max( 1, p->str_cur );
 
     // And now determine the moves...
     int dig_minutes = deep ? deep_pit_time : shallow_pit_time;

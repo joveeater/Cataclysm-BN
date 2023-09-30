@@ -116,7 +116,6 @@ static const itype_id itype_food_processor( "food_processor" );
 static const itype_id itype_forge( "forge" );
 static const itype_id itype_hotplate( "hotplate" );
 static const itype_id itype_kiln( "kiln" );
-static const itype_id itype_nail( "nail" );
 static const itype_id itype_press( "press" );
 static const itype_id itype_soldering_iron( "soldering_iron" );
 static const itype_id itype_vac_sealer( "vac_sealer" );
@@ -4742,7 +4741,7 @@ void map::process_items_in_submap( submap &current_submap, const tripoint &gridp
     std::vector<item *> active_items = current_submap.active_items.get_for_processing();
     const point grid_offset( gridp.x * SEEX, gridp.y * SEEY );
     for( item *&active_item_ref : active_items ) {
-        if( !active_item_ref ) {
+        if( !active_item_ref || !active_item_ref->is_loaded() ) {
             // The item was destroyed, so skip it.
             continue;
         }

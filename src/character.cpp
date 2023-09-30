@@ -1,4 +1,5 @@
 #include "character.h"
+#include "bodypart.h"
 #include "character_encumbrance.h"
 
 #include <algorithm>
@@ -29,6 +30,7 @@
 #include "consumption.h"
 #include "coordinate_conversions.h"
 #include "coordinates.h"
+#include "creature.h"
 #include "damage.h"
 #include "debug.h"
 #include "disease.h"
@@ -220,6 +222,7 @@ static const trait_id trait_ANTLERS( "ANTLERS" );
 static const trait_id trait_ASTHMA( "ASTHMA" );
 static const trait_id trait_BADBACK( "BADBACK" );
 static const trait_id trait_CF_HAIR( "CF_HAIR" );
+static const trait_id trait_GLASSJAW( "GLASSJAW" );
 static const trait_id trait_DEBUG_NODMG( "DEBUG_NODMG" );
 static const trait_id trait_DEFT( "DEFT" );
 static const trait_id trait_PROF_SKATER( "PROF_SKATER" );
@@ -377,7 +380,6 @@ static const flag_str_id flag_BIONIC_ARMOR_INTERFACE( "BIONIC_ARMOR_INTERFACE" )
 static const mtype_id mon_player_blob( "mon_player_blob" );
 static const mtype_id mon_shadow_snake( "mon_shadow_snake" );
 
-static const trait_flag_str_id trait_flag_PRED1( "PRED1" );
 static const trait_flag_str_id trait_flag_PRED2( "PRED2" );
 static const trait_flag_str_id trait_flag_PRED3( "PRED3" );
 static const trait_flag_str_id trait_flag_PRED4( "PRED4" );
@@ -825,13 +827,57 @@ character_id Character::getID() const
     return this->id;
 }
 
-bool Character::is_dead_state() const
+auto Character::is_dead_state() const -> bool
 {
-    const auto all_bps = get_all_body_parts( true );
+    if( cached_dead_state.has_value() ) {
+        return cached_dead_state.value();
+    }
 
-    return std::any_of( all_bps.begin(), all_bps.end(), [this]( const bodypart_id & bp ) {
+    const auto all_bps = get_all_body_parts( true );
+    cached_dead_state = std::any_of( all_bps.begin(), all_bps.end(), [this]( const bodypart_id & bp ) {
         return bp->essential && get_part_hp_cur( bp ) <= 0;
     } );
+    return cached_dead_state.value();
+}
+
+void Character::set_part_hp_cur( const bodypart_id &id, int set )
+{
+    if( set <= 0 ) {
+        cached_dead_state.reset();
+    }
+    Creature::set_part_hp_cur( id, set );
+}
+
+void Character::set_part_hp_max( const bodypart_id &id, int set )
+{
+    if( set <= 0 ) {
+        cached_dead_state.reset();
+    }
+    Creature::set_part_hp_max( id, set );
+}
+
+void Character::mod_part_hp_cur( const bodypart_id &id, int mod )
+{
+    if( mod < 0 ) {
+        cached_dead_state.reset();
+    }
+    Creature::mod_part_hp_cur( id, mod );
+}
+
+void Character::mod_part_hp_max( const bodypart_id &id, int mod )
+{
+    if( mod < 0 ) {
+        cached_dead_state.reset();
+    }
+    Creature::mod_part_hp_max( id, mod );
+}
+
+void Character::set_all_parts_hp_cur( int set )
+{
+    if( set <= 0 ) {
+        cached_dead_state.reset();
+    }
+    Creature::set_all_parts_hp_cur( set );
 }
 
 field_type_id Character::bloodType() const
@@ -1945,6 +1991,7 @@ void Character::recalc_hp()
     float hp_mod = 1.0f + mutation_value( "hp_modifier" ) + mutation_value( "hp_modifier_secondary" );
     float hp_adjustment = mutation_value( "hp_adjustment" ) + ( str_boost_val * 3 );
     calc_all_parts_hp( hp_mod, hp_adjustment, get_str_base() );
+    cached_dead_state.reset();
 }
 
 void Character::calc_all_parts_hp( float hp_mod, float hp_adjustment, int str_max )
@@ -1953,7 +2000,7 @@ void Character::calc_all_parts_hp( float hp_mod, float hp_adjustment, int str_ma
         bodypart &bp = get_part( part.first );
         int new_max = ( part.first->base_hp + str_max * 3 + hp_adjustment ) * hp_mod;
 
-        if( has_trait( trait_id( "GLASSJAW" ) ) && part.first == bodypart_str_id( "head" ) ) {
+        if( has_trait( trait_GLASSJAW ) && part.first == bodypart_str_id( "head" ) ) {
             new_max *= 0.8;
         }
 
