@@ -24,6 +24,7 @@
 #include "item.h"
 #include "item_contents.h"
 #include "itype.h"
+#include "make_static.h"
 #include "magic_enchantment.h"
 #include "map.h"
 #include "map_iterator.h"
@@ -217,7 +218,7 @@ bool mutation_branch::conflicts_with_item( const item &it ) const
     }
 
     for( body_part bp : restricts_gear ) {
-        if( it.covers( bp ) ) {
+        if( it.covers( convert_bp( bp ).id() ) ) {
             return true;
         }
     }
@@ -290,8 +291,7 @@ void Character::mutation_effect( const trait_id &mut )
     }
 
     remove_worn_items_with( [&]( detached_ptr<item> &&armor ) {
-        static const std::string mutation_safe = "OVERSIZE";
-        if( armor->has_flag( mutation_safe ) ) {
+        if( armor->has_flag( STATIC( flag_id( "OVERSIZE" ) ) ) ) {
             return std::move( armor );
         }
         if( !branch.conflicts_with_item( *armor ) ) {
@@ -431,7 +431,7 @@ bool Character::can_use_heal_item( const item &med ) const
         }
     }
     if( !got_restriction ) {
-        can_use = !med.has_flag( "CANT_HEAL_EVERYONE" );
+        can_use = !med.has_flag( STATIC( flag_id( "CANT_HEAL_EVERYONE" ) ) );
     }
 
     if( !can_use ) {

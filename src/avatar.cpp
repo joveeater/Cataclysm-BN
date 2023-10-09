@@ -42,6 +42,7 @@
 #include "itype.h"
 #include "iuse.h"
 #include "kill_tracker.h"
+#include "make_static.h"
 #include "magic_teleporter_list.h"
 #include "map.h"
 #include "map_memory.h"
@@ -94,7 +95,10 @@ static const trait_id trait_HYPEROPIC( "HYPEROPIC" );
 static const trait_id trait_ILLITERATE( "ILLITERATE" );
 static const trait_id trait_PROF_DICEMASTER( "PROF_DICEMASTER" );
 
-static const std::string flag_FIX_FARSIGHT( "FIX_FARSIGHT" );
+static const flag_id flag_FIX_FARSIGHT( "FIX_FARSIGHT" );
+
+static const morale_type MORALE_FOOD_COLD( "morale_food_cold" );
+static const morale_type MORALE_FOOD_VERY_COLD( "morale_food_very_cold" );
 
 class JsonIn;
 class JsonOut;
@@ -116,8 +120,8 @@ avatar::avatar() : player()
 }
 
 avatar::~avatar() = default;
-avatar::avatar( avatar && ) = default;
-avatar &avatar::operator=( avatar && ) = default;
+avatar::avatar( avatar && )  noexcept = default;
+avatar &avatar::operator=( avatar && )  noexcept = default;
 
 void avatar::toggle_map_memory()
 {
@@ -284,7 +288,8 @@ const player *avatar::get_book_reader( const item &book, std::vector<std::string
     // Check for conditions that disqualify us only if no NPCs can read to us
     if( type->intel > 0 && has_trait( trait_ILLITERATE ) ) {
         reasons.emplace_back( _( "You're illiterate!" ) );
-    } else if( has_trait( trait_HYPEROPIC ) && !worn_with_flag( flag_FIX_FARSIGHT ) &&
+    } else if( has_trait( trait_HYPEROPIC ) &&
+               !worn_with_flag( STATIC( flag_id( "FIX_FARSIGHT" ) ) ) &&
                !has_effect( effect_contacts ) && !has_bionic( bio_eye_optic ) ) {
         reasons.emplace_back( _( "Your eyes won't focus without reading glasses." ) );
     } else if( !character_funcs::can_see_fine_details( *this ) ) {
@@ -313,7 +318,8 @@ const player *avatar::get_book_reader( const item &book, std::vector<std::string
         } else if( skill && elem->get_skill_level( skill ) < type->req ) {
             reasons.push_back( string_format( _( "%s %d needed to understand.  %s has %d" ),
                                               skill.obj().name(), type->req, elem->disp_name(), elem->get_skill_level( skill ) ) );
-        } else if( elem->has_trait( trait_HYPEROPIC ) && !elem->worn_with_flag( flag_FIX_FARSIGHT ) &&
+        } else if( elem->has_trait( trait_HYPEROPIC ) &&
+                   !elem->worn_with_flag( STATIC( flag_id( "FIX_FARSIGHT" ) ) ) &&
                    !elem->has_effect( effect_contacts ) ) {
             reasons.push_back( string_format( _( "%s needs reading glasses!" ),
                                               elem->disp_name() ) );
@@ -770,11 +776,11 @@ void avatar::do_read( item *loc )
         player *n = g->find_npc( character_id( activity->values[i] ) );
         if( n != nullptr ) {
             const std::string &s = activity->get_str_value( i, "1" );
-            learners.push_back( { n, strtod( s.c_str(), nullptr ) } );
+            learners.emplace_back( n, strtod( s.c_str(), nullptr ) );
         }
         // Otherwise they must have died/teleported or something
     }
-    learners.push_back( { this, 1.0 } );
+    learners.emplace_back( this, 1.0 );
     //whether to continue reading or not
     bool continuous = false;
     // NPCs who learned a little about the skill
@@ -982,6 +988,8 @@ void avatar::vomit()
         // Remove all joy from previously eaten food and apply the penalty
         rem_morale( MORALE_FOOD_GOOD );
         rem_morale( MORALE_FOOD_HOT );
+        rem_morale( MORALE_FOOD_COLD );
+        rem_morale( MORALE_FOOD_VERY_COLD );
         // bears must suffer too
         rem_morale( MORALE_HONEY );
         // 1.5 times longer

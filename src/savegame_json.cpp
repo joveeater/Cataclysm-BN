@@ -58,6 +58,7 @@
 #include "faction.h"
 #include "field.h"
 #include "field_type.h"
+#include "flag.h"
 #include "flat_set.h"
 #include "game.h"
 #include "game_constants.h"
@@ -2279,14 +2280,10 @@ void item::io( Archive &archive )
         std::swap( irradiation, poison );
     }
 
-    // erase all invalid flags (not defined in flags.json), display warning about invalid flags
-    erase_if( item_tags, [&]( const std::string & f ) {
-        if( !json_flag::get( f ).id.is_valid() ) {
-            debugmsg( "item of type '%s' was loaded with undefined flag '%s'.", typeId().c_str(), f );
-            return true;
-        } else {
-            return false;
-        }
+    // erase all invalid flags (not defined in flags.json)
+    // warning was generated earlier on load
+    erase_if( item_tags, [&]( const flag_id & f ) {
+        return !f.is_valid();
     } );
 
     if( note_read ) {
@@ -2307,7 +2304,7 @@ void item::io( Archive &archive )
     if( is_food() ) {
         active = true;
     }
-    if( !active && item_tags.count( "WET" ) > 0 ) {
+    if( !active && has_flag( flag_WET ) ) {
         // Some wet items from legacy saves may be inactive
         active = true;
     }
@@ -2520,7 +2517,7 @@ void vehicle_part::deserialize( JsonIn &jsin )
     }
 
     // with VEHICLE tag migrate fuel tanks only if amount field exists
-    if( base->has_flag( "VEHICLE" ) ) {
+    if( base->has_flag( flag_id( "VEHICLE" ) ) ) {
         if( data.has_int( "amount" ) && ammo_capacity() > 0 && legacy_fuel != itype_battery ) {
             ammo_set( legacy_fuel, data.get_int( "amount" ) );
         }
@@ -2530,7 +2527,7 @@ void vehicle_part::deserialize( JsonIn &jsin )
         if( ammo_capacity() > 0 ) {
             ammo_set( legacy_fuel, data.get_int( "amount" ) );
         }
-        base->item_tags.insert( "VEHICLE" );
+        base->item_tags.insert( flag_id( "VEHICLE" ) );
     }
 
     if( data.has_int( "hp" ) && id.obj().durability > 0 ) {
@@ -3052,7 +3049,7 @@ void Creature::store( JsonOut &jsout ) const
 
     // Because JSON requires string keys we need to convert our int keys
     std::unordered_map<std::string, std::unordered_map<std::string, effect>> tmp_map;
-    for( auto maps : *effects ) {
+    for( const auto &maps : *effects ) {
         for( const auto &i : maps.second ) {
             if( i.second.is_removed() ) {
                 continue;
@@ -3102,18 +3099,18 @@ void Creature::load( const JsonObject &jsin )
         std::unordered_map<std::string, std::unordered_map<std::string, effect>> tmp_map;
         jsin.read( "effects", tmp_map );
         int key_num = 0;
-        for( auto maps : tmp_map ) {
+        for( const auto &maps : tmp_map ) {
             const efftype_id id( maps.first );
             if( !id.is_valid() ) {
                 debugmsg( "Invalid effect: %s", id.c_str() );
                 continue;
             }
-            for( auto i : maps.second ) {
+            for( const auto &i : maps.second ) {
                 if( !( std::istringstream( i.first ) >> key_num ) ) {
                     key_num = 0;
                 }
                 const bodypart_str_id &bp = convert_bp( static_cast<body_part>( key_num ) );
-                effect &e = i.second;
+                const effect &e = i.second;
 
                 ( *effects )[id][bp] = e;
                 on_effect_int_change( id, e.get_intensity(), bp );

@@ -53,7 +53,9 @@ static const itype_id itype_water_acid_weak( "water_acid_weak" );
 static const trait_id trait_CEPH_VISION( "CEPH_VISION" );
 static const trait_id trait_FEATHERS( "FEATHERS" );
 
-static const std::string flag_SUN_GLASSES( "SUN_GLASSES" );
+static const flag_id json_flag_RAIN_PROTECT( "RAIN_PROTECT" );
+static const flag_id json_flag_RAINPROOF( "RAINPROOF" );
+static const flag_id json_flag_SUN_GLASSES( "SUN_GLASSES" );
 
 /**
  * \defgroup Weather "Weather and its implications."
@@ -75,7 +77,7 @@ void glare( const weather_type_id &w )
 {
     //General prepequisites for glare
     if( !is_player_outside() || !g->is_in_sunlight( g->u.pos() ) || g->u.in_sleep_state() ||
-        g->u.worn_with_flag( flag_SUN_GLASSES ) ||
+        g->u.worn_with_flag( json_flag_SUN_GLASSES ) ||
         g->u.has_bionic( bio_sunglasses ) ||
         g->u.is_blind() ) {
         return;
@@ -374,8 +376,8 @@ void weather_effect::wet_player( int amount )
     Character &target = get_avatar();
     if( !is_player_outside() ||
         target.has_trait( trait_FEATHERS ) ||
-        target.primary_weapon().has_flag( "RAIN_PROTECT" ) ||
-        ( !one_in( 50 ) && target.worn_with_flag( "RAINPROOF" ) ) ) {
+        target.primary_weapon().has_flag( json_flag_RAIN_PROTECT ) ||
+        ( !one_in( 50 ) && target.worn_with_flag( json_flag_RAINPROOF ) ) ) {
         return;
     }
     // Coarse correction to get us back to previously intended soaking rate.
@@ -391,7 +393,7 @@ void weather_effect::wet_player( int amount )
         const body_part_set &covered = it->get_covered_body_parts();
         for( size_t i = 0; i < num_bp; i++ ) {
             body_part token = static_cast<body_part>( i );
-            if( covered.test( token ) ) {
+            if( covered.test( convert_bp( token ) ) ) {
                 clothing_map[convert_bp( token )].emplace_back( it );
             }
         }
@@ -406,10 +408,10 @@ void weather_effect::wet_player( int amount )
 
     const auto &wet = g->u.body_wetness;
     const auto &capacity = g->u.drench_capacity;
-    body_part_set drenched_parts{ { bp_torso, bp_arm_l, bp_arm_r, bp_head } };
+    body_part_set drenched_parts{ { bodypart_str_id( "torso" ), bodypart_str_id( "arm_l" ), bodypart_str_id( "arm_r" ), bodypart_str_id( "head" ) } };
     if( wet[bp_torso] * 100 >= capacity[bp_torso] * 50 ) {
         // Once upper body is 50%+ drenched, start soaking the legs too
-        drenched_parts |= { { bp_leg_l, bp_leg_r } };
+        drenched_parts.unify_set( { { bodypart_str_id( "leg_l" ), bodypart_str_id( "leg_r" ) } } );
     }
 
     g->u.drench( amount, drenched_parts, false );
@@ -461,10 +463,10 @@ void weather_effect::lightning( int intensity )
 void weather_effect::light_acid( int intensity )
 {
     if( calendar::once_every( time_duration::from_seconds( intensity ) ) && is_player_outside() ) {
-        if( g->u.primary_weapon().has_flag( "RAIN_PROTECT" ) && !one_in( 3 ) ) {
+        if( g->u.primary_weapon().has_flag( json_flag_RAIN_PROTECT ) && !one_in( 3 ) ) {
             add_msg( _( "Your %s protects you from the acidic drizzle." ), g->u.primary_weapon().tname() );
         } else {
-            if( g->u.worn_with_flag( "RAINPROOF" ) && !one_in( 4 ) ) {
+            if( g->u.worn_with_flag( json_flag_RAINPROOF ) && !one_in( 4 ) ) {
                 add_msg( _( "Your clothing protects you from the acidic drizzle." ) );
             } else {
                 bool has_helmet = false;
@@ -492,11 +494,11 @@ void weather_effect::acid( int intensity )
     }
 
     auto &you = get_avatar();
-    if( you.primary_weapon().has_flag( "RAIN_PROTECT" ) && one_in( 4 ) ) {
+    if( you.primary_weapon().has_flag( json_flag_RAIN_PROTECT ) && one_in( 4 ) ) {
         return add_msg( _( "Your umbrella protects you from the acid rain." ) );
     }
 
-    if( you.worn_with_flag( "RAINPROOF" ) && one_in( 2 ) ) {
+    if( you.worn_with_flag( json_flag_RAINPROOF ) && one_in( 2 ) ) {
         return add_msg( _( "Your clothing protects you from the acid rain." ) );
     }
 
@@ -1131,7 +1133,7 @@ int weather_manager::get_temperature( const tripoint &location ) const
                        ? 0
                        : g->m.get_temperature( location ) + temp_mod );
 
-    temperature_cache.emplace( std::make_pair( location, temp ) );
+    temperature_cache.emplace( location, temp );
     return temp;
 }
 

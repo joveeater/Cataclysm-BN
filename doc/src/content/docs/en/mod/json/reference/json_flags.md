@@ -278,7 +278,11 @@ to find which flags work elsewhere.
 
 ## Books
 
-- `INSPIRATIONAL` Reading this book grants bonus morale to characters with the SPIRITUAL trait.
+- `BOOK_CANNIBAL` Reading this book converts negative morale to positive morale for characters with
+  the CANNIBAL, PSYCHOPATH, or SAPIVORE trait flags.
+- `INSPIRATIONAL` Reading this book grants bonus morale to characters with the SPIRITUAL trait flag.
+- `MORBID` Reading this book converts negative morale to positive morale for characters with the
+  PSYCHOPATH trait flag.
 
 ### Use actions
 
@@ -458,7 +462,6 @@ to find which flags work elsewhere.
   flags: BIRD, CATTLE.
 - `FERTILIZER` Works as fertilizer for farming, of if this consumed with the PLANTBLECH function
   penalties will be reversed for plants.
-- `FREEZERBURN` First thaw is MUSHY, second is rotten
 - `FUNGAL_VECTOR` Will give a fungal infection when consumed.
 - `HIDDEN_HALLU` ... Food causes hallucinations, visible only with a certain survival skill level.
 - `HIDDEN_POISON` ... Food displays as poisonous with a certain survival skill level. Note that this
@@ -1187,10 +1190,10 @@ to them.
 The following show all trait flags that are currently used by the game's code. Trait flags must also
 be defined in JSON if they are to be used in NPC dialogue conditions.
 
-- `CANNIBAL` No morale penalty from butchery human corpses, skips warning you about human meat.
-  NOTE: this only skips the warning, the actual morale effects of eating human flesh still require
-  one of the relevant traits. Custom traits with this flag will skip the warning and suffer the
-  morale penalty.
+- `CANNIBAL` No morale penalty from butchering human corpses, converts negative morale of books with
+  the BOOK_CANNIBAL flag into positive, skips warning you about human meat. NOTE: this only skips
+  the warning, the actual morale effects of eating human flesh still require one of the relevant
+  traits. Custom traits with this flag will skip the warning and suffer the morale penalty.
 - `NEED_ACTIVE_TO_MELEE` A mutation with this flag will only provide unarmed bonuses if it's been
   toggled on.
 - `NO_RADIATION` This mutation grants immunity to radiations.
@@ -1209,9 +1212,13 @@ be defined in JSON if they are to be used in NPC dialogue conditions.
   negates skill rust of combat skills (if skill rust is enabled), negates morale impact of enzlaving
   zombie corpses, increases tolerance for enzlaving zombies while already depressed, negates morale
   impact of killing monsters with the `GUILT` flag.
-- `PSYCHOPATH` No morale penalty from butchering human corpses.
-- `SAPIVORE` No morale penalty from butcheing human corpses.
+- `PSYCHOPATH` No morale penalty from butchering human corpses, converts negative morale of books
+  with the BOOK_CANNIBAL and MORBID flags into positive.
+- `SAPIVORE` No morale penalty from butcheing human corpses, converts negative morale of books with
+  the BOOK_CANNIBAL flag into positive.
 - `SILENT_SPELL` Negates the negative impact of mouth encumbrance on spells with the `VERBAL` flag.
+- `SPIRITUAL` Grants bonus morale from reading books with the INSPIRATIONAL flag, converting to
+  positive if negative.
 - `SUBTLE_SPELL` Negates the negative impact of arm encumbrance on spells with the `SOMATIC` flag.
 - `UNARMED_BONUS` You get a bonus to unarmed bash and cut damage equal to unarmed_skill/2 up to 4.
 
@@ -1471,8 +1478,6 @@ Those flags are added by the game code to specific items (that specific welder, 
 - `HIDDEN_ITEM` This item cannot be seen in AIM.
 - `HOT` Item is hot (see EATEN_HOT).
 - `LITCIG` Marks a lit smoking item (cigarette, joint etc.).
-- `MUSHY` FREEZERBURN item was frozen and is now mushy and tasteless and will go bad after freezing
-  again.
 - `NO_PARASITES` Invalidates parasites count set in food->type->comestible->parasites
 - `QUARTERED` Corpse was quartered into parts. Affects butcher results, weight, volume.
 - `REVIVE_SPECIAL` ... Corpses revives when the player is nearby.

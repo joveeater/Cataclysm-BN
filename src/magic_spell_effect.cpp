@@ -381,7 +381,8 @@ std::set<tripoint> spell_effect::spell_effect_line( const spell &, const tripoin
 // spells do not reduce in damage the further away from the epicenter the targets are
 // rather they do their full damage in the entire area of effect
 std::set<tripoint> calculate_spell_effect_area( const spell &sp, const tripoint &target,
-        std::function<std::set<tripoint>( const spell &, const tripoint &, const tripoint &, int, bool )>
+        const std::function<std::set<tripoint>( const spell &, const tripoint &, const tripoint &, int, bool )>
+        &
         aoe_func, const Creature &caster, bool ignore_walls )
 {
     std::set<tripoint> targets = { target }; // initialize with epicenter
@@ -408,7 +409,7 @@ static std::set<tripoint> spell_effect_area( const spell &sp, const tripoint &ta
         aoe_func, const Creature &caster, bool ignore_walls = false )
 {
     // calculate spell's effect area
-    std::set<tripoint> targets = calculate_spell_effect_area( sp, target, aoe_func, caster,
+    std::set<tripoint> targets = calculate_spell_effect_area( sp, target, std::move( aoe_func ), caster,
                                  ignore_walls );
 
     // Draw the explosion
@@ -733,14 +734,14 @@ void spell_effect::spawn_ethereal_item( const spell &sp, Creature &caster, const
     item &as_item = *granted;
     if( !granted->is_comestible() && !( sp.has_flag( spell_flag::PERMANENT ) && sp.is_max_level() ) ) {
         granted->set_var( "ethereal", to_turns<int>( sp.duration_turns() ) );
-        granted->set_flag( "ETHEREAL_ITEM" );
+        granted->set_flag( flag_id( "ETHEREAL_ITEM" ) );
     }
     if( granted->count_by_charges() && sp.damage() > 0 ) {
         granted->charges = sp.damage();
     }
     avatar &you = get_avatar();
     if( you.can_wear( *granted ).success() ) {
-        granted->set_flag( "FIT" );
+        granted->set_flag( flag_id( "FIT" ) );
         you.wear_item( std::move( granted ), false );
     } else if( !you.is_armed() ) {
         you.set_primary_weapon( std::move( granted ) );

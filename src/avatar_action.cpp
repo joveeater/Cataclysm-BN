@@ -25,6 +25,7 @@
 #include "cursesdef.h"
 #include "debug.h"
 #include "enums.h"
+#include "flag.h"
 #include "game.h"
 #include "game_constants.h"
 #include "game_inventory.h"
@@ -83,9 +84,6 @@ static const trait_id trait_GRAZER( "GRAZER" );
 static const trait_id trait_RUMINANT( "RUMINANT" );
 static const trait_id trait_SHELL2( "SHELL2" );
 
-static const std::string flag_ALLOWS_REMOTE_USE( "ALLOWS_REMOTE_USE" );
-static const std::string flag_DIG_TOOL( "DIG_TOOL" );
-static const std::string flag_NO_UNWIELD( "NO_UNWIELD" );
 static const std::string flag_RAMP_END( "RAMP_END" );
 static const std::string flag_SWIMMABLE( "SWIMMABLE" );
 static const std::string flag_LADDER( "LADDER" );
@@ -120,12 +118,19 @@ bool avatar_action::move( avatar &you, map &m, const tripoint &d )
     const bool auto_features = get_option<bool>( "AUTO_FEATURES" );
     const bool auto_mine = auto_features && get_option<bool>( "AUTO_MINING" );
 
+    const auto can_use_ladder = [&]() -> bool {
+        if( is_riding || m.has_floor_or_support( dest_loc ) )
+        {
+            return false;
+        }
+        return m.has_flag( flag_LADDER, dest_loc + tripoint_below );
+    };
+
     bool via_ramp = false;
     if( m.has_flag( TFLAG_RAMP_UP, dest_loc ) ) {
         dest_loc.z += 1;
         via_ramp = true;
-    } else if( m.has_flag( TFLAG_RAMP_DOWN, dest_loc ) ||
-               ( !is_riding && m.has_flag( flag_LADDER, dest_loc + tripoint_below ) ) ) {
+    } else if( m.has_flag( TFLAG_RAMP_DOWN, dest_loc ) || can_use_ladder() ) {
         dest_loc.z -= 1;
         via_ramp = true;
     }
@@ -583,13 +588,13 @@ void avatar_action::swim( map &m, avatar &you, const tripoint &p )
     }
 
     body_part_set drenchFlags{ {
-            bp_leg_l, bp_leg_r, bp_torso, bp_arm_l,
-            bp_arm_r, bp_foot_l, bp_foot_r, bp_hand_l, bp_hand_r
+            bodypart_str_id( "leg_l" ), bodypart_str_id( "leg_r" ), bodypart_str_id( "torso" ), bodypart_str_id( "arm_l" ),
+            bodypart_str_id( "arm_r" ), bodypart_str_id( "foot_l" ), bodypart_str_id( "foot_r" ), bodypart_str_id( "hand_l" ), bodypart_str_id( "hand_r" )
         }
     };
 
     if( you.is_underwater() ) {
-        drenchFlags |= { { bp_head, bp_eyes, bp_mouth, bp_hand_l, bp_hand_r } };
+        drenchFlags.unify_set( { { bodypart_str_id( "head" ), bodypart_str_id( "eyes" ), bodypart_str_id( "mouth" ), bodypart_str_id( "hand_l" ), bodypart_str_id( "hand_r" ) } } );
     }
     you.drench( 100, drenchFlags, true );
 }
@@ -1168,7 +1173,7 @@ void avatar_action::reload( item &loc, bool prompt, bool empty )
     item *it = &loc;
 
     // bows etc. do not need to reload. select favorite ammo for them instead
-    if( it->has_flag( "RELOAD_AND_SHOOT" ) ) {
+    if( it->has_flag( flag_RELOAD_AND_SHOOT ) ) {
         ranged::prompt_select_default_ammo_for( u, *it );
         return;
     }
@@ -1196,8 +1201,9 @@ void avatar_action::reload( item &loc, bool prompt, bool empty )
     }
 
     bool use_loc = true;
-    if( !it->has_flag( "ALLOWS_REMOTE_USE" ) ) {
+    if( !it->has_flag( flag_ALLOWS_REMOTE_USE ) ) {
         loc.obtain( u );
+
         use_loc = false;
     }
 
@@ -1233,7 +1239,7 @@ void avatar_action::reload( item &loc, bool prompt, bool empty )
         } else {
             u.activity->targets.emplace_back( opt.target );
         }
-        u.activity->targets.push_back( opt.ammo );
+        u.activity->targets.emplace_back( opt.ammo );
     }
 }
 
@@ -1325,7 +1331,7 @@ void avatar_action::reload_weapon( bool try_everything )
             u.assign_activity( std::make_unique<player_activity>( activity_id( "ACT_RELOAD" ), opt.moves(),
                                opt.qty() ) );
             u.activity->targets.emplace_back( turret.base() );
-            u.activity->targets.push_back( opt.ammo );
+            u.activity->targets.emplace_back( opt.ammo );
         }
         return;
     }

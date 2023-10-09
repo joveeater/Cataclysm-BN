@@ -1145,6 +1145,7 @@ void talk_function::field_harvest( npc &p, const std::string &place )
                 const islot_seed &seed_data = *( *seed )->type->seed;
                 tmp = item::spawn_temporary( seed_data.fruit_id, calendar::turn );
                 if( tmp->typeId() == plant_types[plant_index] ) {
+                    seed = map_stack::iterator();
                     number_plots++;
                     bay.i_clear( plot );
                     bay.furn_set( plot, f_null );
@@ -1901,7 +1902,7 @@ npc_ptr talk_function::companion_choose( const std::map<skill_id, int> &required
             basecamp *player_camp = *bcp;
             std::vector<npc_ptr> camp_npcs = player_camp->get_npcs_assigned();
             if( std::any_of( camp_npcs.begin(), camp_npcs.end(),
-            [guy]( npc_ptr i ) {
+            [guy]( const npc_ptr & i ) {
             return i == guy;
         } ) ) {
                 available.push_back( guy );
@@ -1914,7 +1915,7 @@ npc_ptr talk_function::companion_choose( const std::map<skill_id, int> &required
                 basecamp *temp_camp = *guy_camp;
                 std::vector<npc_ptr> assigned_npcs = temp_camp->get_npcs_assigned();
                 if( std::any_of( assigned_npcs.begin(), assigned_npcs.end(),
-                [guy]( npc_ptr i ) {
+                [guy]( const npc_ptr & i ) {
                 return i == guy;
             } ) ) {
                     available.push_back( guy );
@@ -2028,6 +2029,7 @@ npc_ptr talk_function::companion_choose_return( const tripoint_abs_omt &omt_pos,
     }
 
     std::vector<std::string> npcs;
+    npcs.reserve( available.size() );
     for( auto &elem : available ) {
         npcs.push_back( ( elem )->name );
     }

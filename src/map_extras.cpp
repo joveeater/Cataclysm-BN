@@ -50,6 +50,7 @@
 #include "translations.h"
 #include "trap.h"
 #include "type_id.h"
+#include "type_id_implement.h"
 #include "ui.h"
 #include "units.h"
 #include "veh_type.h"
@@ -184,12 +185,7 @@ generic_factory<map_extra> extras( "map extra" );
 
 } // namespace
 
-/** @relates string_id */
-template<>
-const map_extra &string_id<map_extra>::obj() const
-{
-    return extras.obj( *this );
-}
+IMPLEMENT_STRING_ID( map_extra, extras )
 
 namespace MapExtras
 {
@@ -2619,6 +2615,7 @@ static bool mx_casings( map &m, const tripoint &abs_sub )
 
     auto copy_list = []( const std::vector<detached_ptr<item>> &old ) {
         std::vector<detached_ptr<item>> n;
+        n.reserve( old.size() );
         for( const detached_ptr<item> &it : old ) {
             n.push_back( item::spawn( *it ) );
         }

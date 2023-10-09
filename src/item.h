@@ -48,6 +48,7 @@ class player;
 class recipe;
 class relic;
 class relic_recharge;
+struct armor_portion_data;
 struct islot_comestible;
 struct itype;
 struct item_comp;
@@ -228,9 +229,8 @@ enum class item_location_type : int {
 class item : public location_visitable<item>, public game_object<item>
 {
     public:
-        struct default_charges_tag {};
-        struct solitary_tag {};
-    private:
+        using FlagsSetType = cata::flat_set<flag_id>;
+
         item();
 
         item( item && ) = delete;
@@ -242,11 +242,13 @@ class item : public location_visitable<item>, public game_object<item>
 
         /** Suppress randomization and always start with default quantity of charges */
 
+        struct default_charges_tag {};
         item( const itype_id &id, time_point turn, default_charges_tag );
         item( const itype *type, time_point turn, default_charges_tag );
 
         /** Default (or randomized) charges except if counted by charges then only one charge */
 
+        struct solitary_tag {};
         item( const itype_id &id, time_point turn, solitary_tag );
         item( const itype *type, time_point turn, solitary_tag );
 
@@ -263,7 +265,6 @@ class item : public location_visitable<item>, public game_object<item>
 
     public:
 
-        using FlagsSetType = cata::flat_set<std::string>;
         friend cata_arena<item>;
         friend item &null_item_reference();
 
@@ -374,7 +375,8 @@ class item : public location_visitable<item>, public game_object<item>
          * This detached item is then passed to the lambda. Whatever is returned by the lambda is then merged back into the original item, even if all charges were taken originally.
          * Trying to call this on a non-count-by-charges item or returning an item dissimilar to the argument will result in a debugmsg.
          */
-        bool attempt_split( int qty, std::function < detached_ptr<item>( detached_ptr<item> && ) > cb );
+        bool attempt_split( int qty, const std::function < detached_ptr<item>( detached_ptr<item> && ) > &
+                            cb );
 
         /**
          * Make a corpse of the given monster type.
@@ -655,7 +657,7 @@ class item : public location_visitable<item>, public game_object<item>
         /** return the average dps of the weapon against evaluation monsters */
         double average_dps( const player &guy ) const;
 
-        double ideal_ranged_dps( const Character &who, gun_mode &mode ) const;
+        double ideal_ranged_dps( const Character &who, std::optional<gun_mode> &mode ) const;
 
         /**
          * Whether the character needs both hands to wield this item.
@@ -1491,8 +1493,8 @@ class item : public location_visitable<item>, public game_object<item>
          * Gun mods that are attached to guns also contribute their flags to the gun item.
          */
         /*@{*/
-        bool has_flag( const std::string &flag ) const;
-        bool has_flag( const flag_str_id &flag ) const;
+
+        bool has_flag( const flag_id &flag ) const;
 
         template<typename Container, typename T = std::decay_t<decltype( *std::declval<const Container &>().begin() )>>
         bool has_any_flag( const Container &flags ) const {
@@ -1506,19 +1508,19 @@ class item : public location_visitable<item>, public game_object<item>
          * Essentially get_flags().count(f).
          * Works faster than `has_flag`
         */
-        bool has_own_flag( const std::string &flag ) const;
+        bool has_own_flag( const flag_id &f ) const;
 
         /** returs read-only set of flags of this item (not including flags from item type or gunmods) */
         const FlagsSetType &get_flags() const;
 
         /** Sets an item specific flag. */
-        void set_flag( const std::string &flag );
+        void set_flag( const flag_id &flag );
 
         /** Removes an item specific flag */
-        void unset_flag( const std::string &flag );
+        void unset_flag( const flag_id &flag );
 
         /** Recursively sets an item specific flag on this item and its components. */
-        void set_flag_recursive( const std::string &flag );
+        void set_flag_recursive( const flag_id &flag );
 
         /** Removes all item specific flags. */
         void unset_flags();
@@ -1600,7 +1602,6 @@ class item : public location_visitable<item>, public game_object<item>
         /**
          * Whether this item (when worn) covers the given body part.
          */
-        bool covers( body_part bp ) const;
         bool covers( const bodypart_id &bp ) const;
         /**
          * Bitset of all covered body parts.
@@ -1656,26 +1657,35 @@ class item : public location_visitable<item>, public game_object<item>
          * Returns clothing layer for item.
          */
         layer_level get_layer() const;
-        /**
-         * Returns the relative coverage that this item has when worn.
-         * Values range from 0 (not covering anything, or no armor at all) to
-         * 100 (covering the whole body part). Items that cover more are more likely to absorb
-         * damage from attacks.
+        /*
+         * Returns the average coverage of each piece of data this item
          */
-        int get_coverage() const;
+        int get_avg_coverage() const;
+        /**
+         * Returns the highest coverage that any piece of data that this item has that covers the bodypart.
+         * Values range from 0 (not covering anything) to 100 (covering the whole body part).
+         * Items that cover more are more likely to absorb damage from attacks.
+         */
+        int get_coverage( const bodypart_id &bodypart ) const;
         /**
          * Returns the encumbrance value that this item has when worn by given
          * player, when containing a particular volume of contents.
          * Returns 0 if this can not be worn at all.
          */
         int get_encumber_when_containing(
-            const Character &, const units::volume &contents_volume ) const;
+            const Character &, const units::volume &contents_volume, const bodypart_id &bodypart ) const;
         /**
          * Returns the encumbrance value that this item has when worn by given
          * player.
          * Returns 0 if this is can not be worn at all.
          */
-        int get_encumber( const Character & ) const;
+        std::optional<armor_portion_data> portion_for_bodypart( const bodypart_id &bodypart ) const;
+        /**
+         * Returns the average encumbrance value that this item across all portions
+         * Returns 0 if this is can not be worn at all.
+         */
+        int get_avg_encumber( const Character & ) const;
+        int get_encumber( const Character &, const bodypart_id &bodypart ) const;
         /**
          * Returns the storage amount (@ref islot_armor::storage) that this item provides when worn.
          * For non-armor it returns 0. The storage amount increases the volume capacity of the
@@ -2261,10 +2271,10 @@ class item : public location_visitable<item>, public game_object<item>
             small_sized_small_char,
             human_sized_small_char,
             big_sized_small_char,
-            not_wearable
+            ignore
         };
 
-        sizing get_sizing( const Character &, bool ) const;
+        sizing get_sizing( const Character & ) const;
 
     protected:
         // Sub-functions of @ref process, they handle the processing for different

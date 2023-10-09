@@ -71,7 +71,9 @@
 static const std::string flag_CHALLENGE( "CHALLENGE" );
 static const std::string flag_CITY_START( "CITY_START" );
 static const std::string flag_SECRET( "SECRET" );
-static const std::string flag_WET( "WET" );
+
+static const flag_id json_flag_no_auto_equip( "no_auto_equip" );
+static const flag_id json_flag_auto_wield( "auto_wield" );
 
 static const trait_id trait_SMELLY( "SMELLY" );
 static const trait_id trait_WEAKSCENT( "WEAKSCENT" );
@@ -573,7 +575,7 @@ bool avatar::create( character_type type, const std::string &tempname )
     std::vector<detached_ptr<item>> prof_items = prof->items( male, get_mutations() );
 
     for( detached_ptr<item> &it : prof_items ) {
-        if( it->has_flag( flag_WET ) ) {
+        if( it->has_flag( STATIC( flag_id( "WET" ) ) ) ) {
             it->active = true;
             it->item_counter = 450; // Give it some time to dry off
         }
@@ -581,11 +583,11 @@ bool avatar::create( character_type type, const std::string &tempname )
             items_identified.insert( it->typeId() );
         }
         // TODO: debugmsg if food that isn't a seed is inedible
-        if( it->has_flag( "no_auto_equip" ) ) {
-            it->unset_flag( "no_auto_equip" );
+        if( it->has_flag( json_flag_no_auto_equip ) ) {
+            it->unset_flag( json_flag_no_auto_equip );
             inv.push_back( std::move( it ) );
-        } else if( it->has_flag( "auto_wield" ) ) {
-            it->unset_flag( "auto_wield" );
+        } else if( it->has_flag( json_flag_auto_wield ) ) {
+            it->unset_flag( json_flag_auto_wield );
             if( !is_armed() ) {
                 wield( std::move( it ) );
             } else {
@@ -1291,6 +1293,7 @@ tab_direction set_traits( avatar &u, points_left &points )
                 // Grab a list of the names of the bionics that block this trait
                 // So that the player know what is preventing them from taking it
                 std::vector<std::string> conflict_names;
+                conflict_names.reserve( cbms_blocking_trait.size() );
                 for( const bionic_id &conflict : cbms_blocking_trait ) {
                     conflict_names.emplace_back( conflict->name.translated() );
                 }
@@ -1545,9 +1548,9 @@ tab_direction set_profession( avatar &u, points_left &points,
                 std::string buffer_worn;
                 std::string buffer_inventory;
                 for( const auto &it : prof_items ) {
-                    if( it->has_flag( "no_auto_equip" ) ) {
+                    if( it->has_flag( json_flag_no_auto_equip ) ) {
                         buffer_inventory += it->display_name() + "\n";
-                    } else if( it->has_flag( "auto_wield" ) ) {
+                    } else if( it->has_flag( json_flag_auto_wield ) ) {
                         buffer_wielded += it->display_name() + "\n";
                     } else if( it->is_armor() ) {
                         buffer_worn += it->display_name() + "\n";
@@ -1577,7 +1580,7 @@ tab_direction set_profession( avatar &u, points_left &points,
                 for( const auto &b : prof_CBMs ) {
                     const auto &cbm = b.obj();
 
-                    if( cbm.activated && cbm.has_flag( STATIC( flag_str_id( "BIONIC_TOGGLED" ) ) ) ) {
+                    if( cbm.activated && cbm.has_flag( STATIC( flag_id( "BIONIC_TOGGLED" ) ) ) ) {
                         buffer += string_format( _( "%s (toggled)" ), cbm.name ) + "\n";
                     } else if( cbm.activated ) {
                         buffer += string_format( _( "%s (activated)" ), cbm.name ) + "\n";
@@ -2496,10 +2499,10 @@ tab_direction set_description( avatar &you, const bool allow_reroll,
 
         std::vector<std::string> vStatNames;
         mvwprintz( w_stats, point_zero, COL_HEADER, _( "Stats:" ) );
-        vStatNames.push_back( _( "Strength:" ) );
-        vStatNames.push_back( _( "Dexterity:" ) );
-        vStatNames.push_back( _( "Intelligence:" ) );
-        vStatNames.push_back( _( "Perception:" ) );
+        vStatNames.emplace_back( _( "Strength:" ) );
+        vStatNames.emplace_back( _( "Dexterity:" ) );
+        vStatNames.emplace_back( _( "Intelligence:" ) );
+        vStatNames.emplace_back( _( "Perception:" ) );
         int pos = 0;
         for( size_t i = 0; i < vStatNames.size(); i++ ) {
             pos = ( utf8_width( vStatNames[i] ) > pos ?

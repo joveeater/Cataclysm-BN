@@ -14,6 +14,7 @@
 #include "character.h"
 #include "construction.h"
 #include "debug.h"
+#include "flag.h"
 #include "flat_set.h"
 #include "game_constants.h"
 #include "item.h"
@@ -33,8 +34,6 @@
 #include "value_ptr.h"
 
 static const std::string flag_ALLOW_FILTHY( "ALLOW_FILTHY" );
-static const std::string flag_FIT( "FIT" );
-static const std::string flag_VARSIZE( "VARSIZE" );
 
 static const itype_id itype_hotplate( "hotplate" );
 static const itype_id itype_dehydrator( "dehydrator" );
@@ -205,7 +204,7 @@ void recipe::load( const JsonObject &jo, const std::string &src )
     }
 
     if( jo.has_member( "delete_flags" ) ) {
-        flags_to_delete = jo.get_tags( "delete_flags" );
+        flags_to_delete = jo.get_tags<flag_id>( "delete_flags" );
     }
 
     // recipes not specifying any external requirements inherit from their parent recipe (if any)
@@ -262,20 +261,20 @@ void recipe::load( const JsonObject &jo, const std::string &src )
                 bp_resources.emplace_back( resource );
             }
             for( JsonObject provide : jo.get_array( "blueprint_provides" ) ) {
-                bp_provides.emplace_back( std::make_pair( provide.get_string( "id" ),
-                                          provide.get_int( "amount", 1 ) ) );
+                bp_provides.emplace_back( provide.get_string( "id" ),
+                                          provide.get_int( "amount", 1 ) );
             }
             // all blueprints provide themselves with needing it written in JSON
-            bp_provides.emplace_back( std::make_pair( result_.str(), 1 ) );
+            bp_provides.emplace_back( result_.str(), 1 );
             for( JsonObject require : jo.get_array( "blueprint_requires" ) ) {
-                bp_requires.emplace_back( std::make_pair( require.get_string( "id" ),
-                                          require.get_int( "amount", 1 ) ) );
+                bp_requires.emplace_back( require.get_string( "id" ),
+                                          require.get_int( "amount", 1 ) );
             }
             // all blueprints exclude themselves with needing it written in JSON
-            bp_excludes.emplace_back( std::make_pair( result_.str(), 1 ) );
+            bp_excludes.emplace_back( result_.str(), 1 );
             for( JsonObject exclude : jo.get_array( "blueprint_excludes" ) ) {
-                bp_excludes.emplace_back( std::make_pair( exclude.get_string( "id" ),
-                                          exclude.get_int( "amount", 1 ) ) );
+                bp_excludes.emplace_back( exclude.get_string( "id" ),
+                                          exclude.get_int( "amount", 1 ) );
             }
             if( jo.has_member( "blueprint_needs" ) ) {
                 has_blueprint_needs = true;
@@ -508,8 +507,8 @@ std::vector<detached_ptr<item>> recipe::create_byproducts( int batch ) const
     std::vector<detached_ptr<item>> bps;
     for( const auto &e : byproducts ) {
         detached_ptr<item> obj = item::spawn( e.first, calendar::turn, item::default_charges_tag{} );
-        if( obj->has_flag( "VARSIZE" ) ) {
-            obj->set_flag( "FIT" );
+        if( obj->has_flag( flag_VARSIZE ) ) {
+            obj->set_flag( flag_FIT );
         }
 
         if( obj->count_by_charges() ) {
@@ -576,7 +575,7 @@ std::string recipe::primary_skill_string( const Character *c, bool print_skill_l
     std::vector< std::pair<skill_id, int> > skillList;
 
     if( !skill_used.is_null() ) {
-        skillList.push_back( std::pair<skill_id, int>( skill_used, difficulty ) );
+        skillList.emplace_back( skill_used, difficulty );
     }
 
     return required_skills_as_string( skillList.begin(), skillList.end(), c, print_skill_level );

@@ -51,6 +51,7 @@
 #include "input.h"
 #include "runtime_handlers.h"
 #include "json.h"
+#include "make_static.h"
 #include "mapbuffer.h"
 #include "mission.h"
 #include "npc.h"
@@ -778,7 +779,7 @@ std::string cata_tiles::get_omt_id_rotation_and_subtile(
     oter_id ot_id = oter_at( omp );
     const oter_t &ot = *ot_id;
     oter_type_id ot_type_id = ot.get_type_id();
-    oter_type_t ot_type = *ot_type_id;
+    const oter_type_t &ot_type = *ot_type_id;
 
     if( ot_type.has_connections() ) {
         // This would be for connected terrain
@@ -2765,7 +2766,8 @@ static void CheckMessages()
                         actions.insert( ACTION_CYCLE_MOVE );
                     }
                     // Only prioritize fire weapon options if we're wielding a ranged weapon.
-                    if( g->u.primary_weapon().is_gun() || g->u.primary_weapon().has_flag( "REACH_ATTACK" ) ) {
+                    if( g->u.primary_weapon().is_gun() ||
+                        g->u.primary_weapon().has_flag( STATIC( flag_id( "REACH_ATTACK" ) ) ) ) {
                         actions.insert( ACTION_FIRE );
                     }
                 }
@@ -3598,7 +3600,7 @@ void load_tileset()
         /*force=*/false,
         /*pump_events=*/true
     );
-    tilecontext->do_tile_loading_report( []( std::string str ) {
+    tilecontext->do_tile_loading_report( []( const std::string & str ) {
         DebugLog( DL::Info, DC::Main ) << str;
     } );
 }

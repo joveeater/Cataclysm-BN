@@ -175,7 +175,7 @@ class inventory : public temp_visitable<inventory>
         bool has_charges( const itype_id &it, int quantity,
                           const std::function<bool( const item & )> &filter = return_true<item> ) const;
 
-        int leak_level( const std::string &flag ) const; // level of leaked bad stuff from items
+        int leak_level( const flag_id &flag ) const; // level of leaked bad stuff from items
 
         // NPC/AI functions
         int worst_item_value( npc *p ) const;
@@ -264,7 +264,7 @@ class location_inventory : public location_visitable<location_inventory>
         location_inventory( item_location *location );
         location_inventory( location_inventory && ) = delete;
         location_inventory( const location_inventory & ) = delete;
-        location_inventory &operator=( location_inventory && );
+        location_inventory &operator=( location_inventory && ) noexcept;
         location_inventory &operator=( const location_inventory & ) = delete;
 
         ~location_inventory();
@@ -333,7 +333,7 @@ class location_inventory : public location_visitable<location_inventory>
         bool has_charges( const itype_id &it, int quantity,
                           const std::function<bool( const item & )> &filter = return_true<item> ) const;
 
-        int leak_level( const std::string &flag ) const; // level of leaked bad stuff from items
+        int leak_level( const flag_id &flag ) const; // level of leaked bad stuff from items
 
         // NPC/AI functions
         int worst_item_value( npc *p ) const;

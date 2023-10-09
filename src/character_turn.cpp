@@ -8,6 +8,7 @@
 #include "character_martial_arts.h"
 #include "character.h"
 #include "creature.h"
+#include "flag.h"
 #include "game.h"
 #include "handle_liquid.h"
 #include "itype.h"
@@ -60,6 +61,7 @@ static const trait_id trait_URSINE_FUR( "URSINE_FUR" );
 static const trait_id trait_WEBBED( "WEBBED" );
 static const trait_id trait_WHISKERS_RAT( "WHISKERS_RAT" );
 static const trait_id trait_WHISKERS( "WHISKERS" );
+static const trait_id trait_DEBUG_STORAGE( "DEBUG_STORAGE" );
 
 static const efftype_id effect_bloodworms( "bloodworms" );
 static const efftype_id effect_brainworms( "brainworms" );
@@ -96,12 +98,15 @@ static const itype_id itype_UPS( "UPS" );
 void Character::recalc_speed_bonus()
 {
     // Minus some for weight...
-    int carry_penalty = 0;
-    if( weight_carried() > weight_capacity() && !has_trait( trait_id( "DEBUG_STORAGE" ) ) ) {
-        carry_penalty = 25 * ( weight_carried() - weight_capacity() ) / ( weight_capacity() );
+    // Easy test, if Character DOES have this trait then we don't need to check weight carried/capacity
+    if( !has_trait( trait_DEBUG_STORAGE ) ) {
+        // these are nontrivial calculations, store in variables so they aren't calculated multiple times.
+        auto carried = weight_carried();
+        auto capacity = weight_capacity();
+        if( carried > capacity ) {
+            mod_speed_bonus( -25 * ( carried - capacity ) / capacity );
+        }
     }
-    mod_speed_bonus( -carry_penalty );
-
     mod_speed_bonus( -character_effects::get_pain_penalty( *this ).speed );
 
     if( get_thirst() > thirst_levels::very_thirsty ) {
@@ -615,7 +620,8 @@ void Character::reset_stats()
     if( has_trait( trait_ARACHNID_ARMS_OK ) ) {
         if( !wearing_something_on( bodypart_id( "torso" ) ) ) {
             mod_dex_bonus( 2 );
-        } else if( !exclusive_flag_coverage( "OVERSIZE" ).test( bp_torso ) ) {
+        } else if( !exclusive_flag_coverage( STATIC( flag_id( "OVERSIZE" ) ) )
+                   .test( STATIC( bodypart_str_id( "torso" ) ) ) ) {
             mod_dex_bonus( -2 );
             add_miss_reason( _( "Your clothing constricts your arachnid limbs." ), 2 );
         }
@@ -831,7 +837,7 @@ void Character::process_items()
 
     // Active item processing done, now we're recharging.
     std::vector<item *> active_worn_items;
-    bool weapon_active = primary_weapon().has_flag( "USE_UPS" ) &&
+    bool weapon_active = primary_weapon().has_flag( flag_USE_UPS ) &&
                          primary_weapon().charges < primary_weapon().type->maximum_charges();
     std::vector<size_t> active_held_items;
     int ch_UPS = 0;
@@ -843,13 +849,13 @@ void Character::process_items()
         } else if( identifier == itype_adv_UPS_off ) {
             ch_UPS += it.ammo_remaining() / 0.6;
         }
-        if( it.has_flag( "USE_UPS" ) && it.charges < it.type->maximum_charges() ) {
+        if( it.has_flag( flag_USE_UPS ) && it.charges < it.type->maximum_charges() ) {
             active_held_items.push_back( index );
         }
     }
     bool update_required = get_check_encumbrance();
     for( item *&w : worn ) {
-        if( w->has_flag( "USE_UPS" ) &&
+        if( w->has_flag( flag_USE_UPS ) &&
             w->charges < w->type->maximum_charges() ) {
             active_worn_items.push_back( w );
         }
@@ -984,22 +990,23 @@ void do_pause( Character &who )
         if( who.is_underwater() ) {
             who.as_player()->practice( skill_swimming, 1 );
             who.drench( 100, { {
-                    bp_leg_l, bp_leg_r, bp_torso, bp_arm_l,
-                    bp_arm_r, bp_head, bp_eyes, bp_mouth,
-                    bp_foot_l, bp_foot_r, bp_hand_l, bp_hand_r
+                    bodypart_str_id( "leg_l" ), bodypart_str_id( "leg_r" ), bodypart_str_id( "torso" ), bodypart_str_id( "arm_l" ),
+                    bodypart_str_id( "arm_r" ), bodypart_str_id( "head" ), bodypart_str_id( "eyes" ), bodypart_str_id( "mouth" ),
+                    bodypart_str_id( "foot_l" ), bodypart_str_id( "foot_r" ), bodypart_str_id( "hand_l" ), bodypart_str_id( "hand_r" )
                 }
             }, true );
         } else if( here.has_flag( TFLAG_DEEP_WATER, who.pos() ) ) {
             who.as_player()->practice( skill_swimming, 1 );
             // Same as above, except no head/eyes/mouth
             who.drench( 100, { {
-                    bp_leg_l, bp_leg_r, bp_torso, bp_arm_l,
-                    bp_arm_r, bp_foot_l, bp_foot_r, bp_hand_l,
-                    bp_hand_r
+                    bodypart_str_id( "leg_l" ), bodypart_str_id( "leg_r" ), bodypart_str_id( "torso" ), bodypart_str_id( "arm_l" ),
+                    bodypart_str_id( "arm_r" ), bodypart_str_id( "foot_l" ), bodypart_str_id( "foot_r" ), bodypart_str_id( "hand_l" ),
+                    bodypart_str_id( "hand_r" )
                 }
             }, true );
         } else if( here.has_flag( "SWIMMABLE", who.pos() ) ) {
-            who.drench( 40, { { bp_foot_l, bp_foot_r, bp_leg_l, bp_leg_r } }, false );
+            who.drench( 40, { { bodypart_str_id( "foot_l" ), bodypart_str_id( "foot_r" ), bodypart_str_id( "leg_l" ), bodypart_str_id( "leg_r" ) } },
+            false );
         }
     }
 

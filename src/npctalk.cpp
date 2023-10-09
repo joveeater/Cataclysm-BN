@@ -12,6 +12,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "activity_type.h"
@@ -29,6 +30,7 @@
 #include "condition.h"
 #include "debug.h"
 #include "enums.h"
+#include "flag.h"
 #include "faction.h"
 #include "faction_camp.h"
 #include "game.h"
@@ -42,6 +44,7 @@
 #include "itype.h"
 #include "json.h"
 #include "line.h"
+#include "make_static.h"
 #include "magic.h"
 #include "map.h"
 #include "mapgen_functions.h"
@@ -1222,7 +1225,7 @@ talk_response &dialogue::add_response( const std::string &text, const std::strin
                                        dialogue_consequence consequence, const bool first )
 {
     talk_response &result = add_response( text, r, first );
-    result.success.set_effect_consequence( effect_success, consequence );
+    result.success.set_effect_consequence( std::move( effect_success ), consequence );
     return result;
 }
 
@@ -1694,7 +1697,7 @@ void parse_tags( std::string &phrase, const Character &u, const Character &me,
 
 void dialogue::add_topic( const std::string &topic_id )
 {
-    topic_stack.push_back( talk_topic( topic_id ) );
+    topic_stack.emplace_back( topic_id );
 }
 
 void dialogue::add_topic( const talk_topic &topic )
@@ -1939,7 +1942,7 @@ talk_effect_fun_t::talk_effect_fun_t( talkfunction_ptr ptr )
     };
 }
 
-talk_effect_fun_t::talk_effect_fun_t( std::function<void( npc &p )> ptr )
+talk_effect_fun_t::talk_effect_fun_t( const std::function<void( npc &p )> &ptr )
 {
     function = [ptr]( const dialogue & d ) {
         npc &p = *d.beta;
@@ -1947,7 +1950,7 @@ talk_effect_fun_t::talk_effect_fun_t( std::function<void( npc &p )> ptr )
     };
 }
 
-talk_effect_fun_t::talk_effect_fun_t( std::function<void( const dialogue &d )> fun )
+talk_effect_fun_t::talk_effect_fun_t( const std::function<void( const dialogue &d )> &fun )
 {
     function = [fun]( const dialogue & d ) {
         fun( d );
@@ -2129,7 +2132,7 @@ void talk_effect_fun_t::set_u_buy_item( const itype_id &item_name, int cost, int
 
     // Update structure used by mission descriptions.
     if( cost <= 0 ) {
-        likely_rewards.push_back( std::pair<int, itype_id>( count, item_name ) );
+        likely_rewards.emplace_back( count, item_name );
     }
 }
 
@@ -2497,7 +2500,7 @@ void talk_effect_t::set_effect_consequence( const talk_effect_fun_t &fun, dialog
 void talk_effect_t::set_effect_consequence( std::function<void( npc &p )> ptr,
         dialogue_consequence con )
 {
-    talk_effect_fun_t npctalk_setter( ptr );
+    talk_effect_fun_t npctalk_setter( std::move( ptr ) );
     set_effect_consequence( npctalk_setter, con );
 }
 
@@ -3113,7 +3116,7 @@ dynamic_line_t::dynamic_line_t( const JsonObject &jo )
     }
 }
 
-dynamic_line_t::dynamic_line_t( JsonArray ja )
+dynamic_line_t::dynamic_line_t( const JsonArray &ja )
 {
     std::vector<dynamic_line_t> lines;
     for( const JsonValue entry : ja ) {
@@ -3393,9 +3396,8 @@ std::string give_item_to( npc &p, bool allow_use )
     }
     item &given = *loc;
 
-    if( ( &given == &you.primary_weapon() && given.has_flag( "NO_UNWIELD" ) ) ||
-        ( you.is_worn( given ) &&
-          given.has_flag( "NO_TAKEOFF" ) ) ) {
+    if( ( &given == &you.primary_weapon() && given.has_flag( flag_NO_UNWIELD ) ) ||
+        ( you.is_worn( given ) && given.has_flag( flag_NO_TAKEOFF ) ) ) {
         // Bionic weapon or shackles
         return _( "How?" );
     }

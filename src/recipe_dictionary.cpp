@@ -16,6 +16,7 @@
 #include "iteminfo_query.h"
 #include "itype.h"
 #include "json.h"
+#include "make_static.h"
 #include "output.h"
 #include "player.h"
 #include "requirements.h"
@@ -394,7 +395,7 @@ void recipe_dictionary::find_items_on_loops()
     items_on_loops.clear();
     std::unordered_map<itype_id, std::vector<itype_id>> potential_components_of;
     for( const itype *i : item_controller->all() ) {
-        if( !i->comestible || i->has_flag( "NUTRIENT_OVERRIDE" ) ) {
+        if( !i->comestible || i->has_flag( STATIC( flag_id( "NUTRIENT_OVERRIDE" ) ) ) ) {
             continue;
         }
         std::vector<itype_id> &potential_components = potential_components_of[i->get_id()];
@@ -466,7 +467,7 @@ void recipe_dictionary::finalize()
 
         // books that don't already have an uncrafting recipe
         if( e->book && !recipe_dict.uncraft.count( rid ) && e->volume > 0_ml ) {
-            int pages = e->volume / 12.5_ml;
+            int pages = std::max( 1, static_cast<int>( e->volume / 12.5_ml ) );
             auto &bk = recipe_dict.uncraft[rid];
             bk.ident_ = rid;
             bk.result_ = id;

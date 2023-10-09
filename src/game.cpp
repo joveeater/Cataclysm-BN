@@ -80,6 +80,7 @@
 #include "field.h"
 #include "field_type.h"
 #include "filesystem.h"
+#include "flag.h"
 #include "fstream_utils.h"
 #include "game_constants.h"
 #include "game_inventory.h"
@@ -426,7 +427,7 @@ void game::toggle_pixel_minimap()
 #endif // TILES
 }
 
-void game::reload_tileset( [[maybe_unused]] std::function<void( std::string )> out )
+void game::reload_tileset( [[maybe_unused]] const std::function<void( std::string )> &out )
 {
 #if defined(TILES)
     // Disable UIs below to avoid accessing the tile context during loading.
@@ -769,11 +770,11 @@ vehicle *game::place_vehicle_nearby(
     if( search_types.empty() ) {
         vehicle veh( id );
         if( veh.can_float() ) {
-            search_types.push_back( "river" );
-            search_types.push_back( "lake" );
+            search_types.emplace_back( "river" );
+            search_types.emplace_back( "lake" );
         } else {
-            search_types.push_back( "field" );
-            search_types.push_back( "road" );
+            search_types.emplace_back( "field" );
+            search_types.emplace_back( "road" );
         }
     }
     for( const std::string &search_type : search_types ) {
@@ -3033,7 +3034,7 @@ void game::draw_callback_t::operator()()
     }
 }
 
-void game::add_draw_callback( shared_ptr_fast<draw_callback_t> cb )
+void game::add_draw_callback( const shared_ptr_fast<draw_callback_t> &cb )
 {
     draw_callbacks.erase(
         std::remove_if( draw_callbacks.begin(), draw_callbacks.end(),
@@ -4532,7 +4533,7 @@ void game::use_computer( const tripoint &p )
         add_msg( m_info, _( "You can not see a computer screen!" ) );
         return;
     }
-    if( u.has_trait( trait_id( "HYPEROPIC" ) ) && !u.worn_with_flag( "FIX_FARSIGHT" ) &&
+    if( u.has_trait( trait_id( "HYPEROPIC" ) ) && !u.worn_with_flag( flag_FIX_FARSIGHT ) &&
         !u.has_effect( effect_contacts ) && !u.has_bionic( bionic_id( "bio_eye_optic" ) ) ) {
         add_msg( m_info, _( "You'll need to put on reading glasses before you can see the screen." ) );
         return;
@@ -4887,8 +4888,8 @@ bool game::revive_corpse( const tripoint &p, item &it )
         // Failed reanimation due to corpse being too burned
         return false;
     }
-    if( it.has_flag( "FIELD_DRESS" ) || it.has_flag( "FIELD_DRESS_FAILED" ) ||
-        it.has_flag( "QUARTERED" ) ) {
+    if( it.has_flag( flag_FIELD_DRESS ) || it.has_flag( flag_FIELD_DRESS_FAILED ) ||
+        it.has_flag( flag_QUARTERED ) ) {
         // Failed reanimation due to corpse being butchered
         return false;
     }
@@ -6009,7 +6010,7 @@ void game::print_items_info( const tripoint &lp, const catacurses::window &w_loo
         return;
     } else if( m.has_flag( "CONTAINER", lp ) && !m.could_see_items( lp, u ) ) {
         mvwprintw( w_look, point( column, ++line ), _( "You cannot see what is inside of it." ) );
-    } else if( u.has_effect( effect_blind ) || u.worn_with_flag( "BLIND" ) ) {
+    } else if( u.has_effect( effect_blind ) || u.worn_with_flag( flag_BLIND ) ) {
         mvwprintz( w_look, point( column, ++line ), c_yellow,
                    _( "There's something there, but you can't see what it is." ) );
         return;
@@ -8103,16 +8104,16 @@ static int get_initial_hotkey( const size_t menu_index )
 //    Pair.second is the number of equivalent items per unique tname
 // There are options for optimization here, but the function is hit infrequently
 // enough that optimizing now is not a useful time expenditure.
-static std::vector<std::pair<map_stack::iterator, int>> generate_butcher_stack_display(
-            const std::vector<map_stack::iterator> &its )
+static std::vector<std::pair<item *, int>> generate_butcher_stack_display(
+        const std::vector<item *> &its )
 {
-    std::vector<std::pair<map_stack::iterator, int>> result;
+    std::vector<std::pair<item *, int>> result;
     std::vector<std::string> result_strings;
     result.reserve( its.size() );
     result_strings.reserve( its.size() );
 
-    for( const map_stack::iterator &it : its ) {
-        const std::string tname = ( *it )->tname();
+    for( item * const &it : its ) {
+        const std::string tname = it->tname();
         size_t s = 0;
         // Search for the index with a string equivalent to tname
         for( ; s < result_strings.size(); ++s ) {
@@ -8138,27 +8139,27 @@ static std::vector<std::pair<map_stack::iterator, int>> generate_butcher_stack_d
 
 // Corpses are always individual items
 // Just add them individually to the menu
-static void add_corpses( uilist &menu, const std::vector<map_stack::iterator> &its,
+static void add_corpses( uilist &menu, const std::vector<item *> &its,
                          size_t &menu_index )
 {
     int hotkey = get_initial_hotkey( menu_index );
 
-    for( const map_stack::iterator &it : its ) {
-        menu.addentry( menu_index++, true, hotkey, ( *it )->get_mtype()->nname() );
+    for( const item * const &it : its ) {
+        menu.addentry( menu_index++, true, hotkey, it->get_mtype()->nname() );
         hotkey = -1;
     }
 }
 
 // Salvagables stack so we need to pass in a stack vector rather than an item index vector
 static void add_salvagables( uilist &menu,
-                             const std::vector<std::pair<map_stack::iterator, int>> &stacks,
+                             const std::vector<std::pair<item *, int>> &stacks,
                              size_t &menu_index, const salvage_actor &salvage_iuse )
 {
     if( !stacks.empty() ) {
         int hotkey = get_initial_hotkey( menu_index );
 
         for( const auto &stack : stacks ) {
-            const item &it = **stack.first;
+            const item &it = *stack.first;
 
             //~ Name and number of items listed for cutting up
             const auto &msg = string_format( pgettext( "butchery menu", "Cut up %s (%d)" ),
@@ -8172,13 +8173,13 @@ static void add_salvagables( uilist &menu,
 
 // Disassemblables stack so we need to pass in a stack vector rather than an item index vector
 static void add_disassemblables( uilist &menu,
-                                 const std::vector<std::pair<map_stack::iterator, int>> &stacks, size_t &menu_index )
+                                 const std::vector<std::pair<item *, int>> &stacks, size_t &menu_index )
 {
     if( !stacks.empty() ) {
         int hotkey = get_initial_hotkey( menu_index );
 
         for( const auto &stack : stacks ) {
-            const item &it = **stack.first;
+            const item &it = *stack.first;
 
             //~ Name, number of items and time to complete disassembling
             const auto &msg = string_format( pgettext( "butchery menu", "%s (%d)" ),
@@ -8192,7 +8193,7 @@ static void add_disassemblables( uilist &menu,
 }
 
 // Butchery sub-menu and time calculation
-static void butcher_submenu( const std::vector<map_stack::iterator> &corpses, int corpse = -1 )
+static void butcher_submenu( const std::vector<item *> &corpses, int corpse = -1 )
 {
     avatar &you = get_avatar();
     const inventory &inv = you.crafting_inventory();
@@ -8210,17 +8211,17 @@ static void butcher_submenu( const std::vector<map_stack::iterator> &corpses, in
     auto cut_time = [&]( enum butcher_type bt ) {
         int time_to_cut = 0;
         if( corpse != -1 ) {
-            time_to_cut = butcher_time_to_cut( you, inv, **corpses[corpse], bt );
+            time_to_cut = butcher_time_to_cut( you, inv, *corpses[corpse], bt );
         } else {
-            for( const map_stack::iterator &it : corpses ) {
-                time_to_cut += butcher_time_to_cut( you, inv, **it, bt );
+            for( const item * const &it : corpses ) {
+                time_to_cut += butcher_time_to_cut( you, inv, *it, bt );
             }
         }
         return to_string_clipped( time_duration::from_turns( time_to_cut / 100 ) );
     };
     auto info_on_action = [&]( butcher_type type ) {
         int corpse_index = corpse == -1 ? 0 : corpse;
-        butchery_setup setup = consider_butchery( **corpses[corpse_index], you, type );
+        butchery_setup setup = consider_butchery( *corpses[corpse_index], you, type );
         std::string out;
         for( const std::string &problem : setup.problems ) {
             out += "\n" + colorize( problem, c_red );
@@ -8233,7 +8234,7 @@ static void butcher_submenu( const std::vector<map_stack::iterator> &corpses, in
     bool has_organs = false;
 
     if( corpse != -1 ) {
-        const mtype *dead_mon = ( *corpses[corpse] )->get_mtype();
+        const mtype *dead_mon = corpses[corpse]->get_mtype();
         if( dead_mon ) {
             for( const harvest_entry &entry : dead_mon->harvest.obj() ) {
                 if( entry.type == "skin" ) {
@@ -8370,9 +8371,9 @@ void game::butcher()
     const item *first_item_without_tools = nullptr;
     // Indices of relevant items
     //TODO!:CHECK
-    std::vector<map_stack::iterator> corpses;
-    std::vector<map_stack::iterator> disassembles;
-    std::vector<map_stack::iterator> salvageables;
+    std::vector<item *> corpses;
+    std::vector<item *> disassembles;
+    std::vector<item *> salvageables;
     map_stack items = m.i_at( u.pos() );
     const inventory &crafting_inv = u.crafting_inventory();
 
@@ -8406,13 +8407,13 @@ void game::butcher()
     // clear it later, but does make the splitting process nicer.
     for( map_stack::iterator it = items.begin(); it != items.end(); ++it ) {
         if( ( *it )->is_corpse() ) {
-            corpses.push_back( it );
+            corpses.push_back( *it );
         } else {
             if( ( salvage_tool_index != INT_MIN ) && salvage_iuse->valid_to_cut_up( **it ) ) {
-                salvageables.push_back( it );
+                salvageables.push_back( *it );
             }
             if( crafting::can_disassemble( u, **it, crafting_inv ).success() ) {
-                disassembles.push_back( it );
+                disassembles.push_back( *it );
             } else if( !first_item_without_tools ) {
                 first_item_without_tools = *it;
             }
@@ -8492,7 +8493,7 @@ void game::butcher()
             int time_to_disassemble = 0;
             int time_to_disassemble_all = 0;
             for( const auto &stack : disassembly_stacks ) {
-                const int time = recipe_dictionary::get_uncraft( ( *stack.first )->typeId() ).time;
+                const int time = recipe_dictionary::get_uncraft( stack.first->typeId() ).time;
                 time_to_disassemble += time;
                 time_to_disassemble_all += time * stack.second;
             }
@@ -8505,7 +8506,7 @@ void game::butcher()
         if( salvage_iuse && salvageables.size() > 1 ) {
             int time_to_salvage = 0;
             for( const auto &stack : salvage_stacks ) {
-                time_to_salvage += salvage_iuse->time_to_cut_up( **stack.first ) * stack.second;
+                time_to_salvage += salvage_iuse->time_to_cut_up( *stack.first ) * stack.second;
             }
 
             kmenu.addentry_col( MULTISALVAGE, true, 'z', _( "Cut up everything" ),
@@ -8559,8 +8560,8 @@ void game::butcher()
                     break;
                 case MULTIBUTCHER:
                     butcher_submenu( corpses );
-                    for( map_stack::iterator &it : corpses ) {
-                        u.activity->targets.emplace_back( *it );
+                    for( item *&it : corpses ) {
+                        u.activity->targets.emplace_back( it );
                     }
                     break;
                 case MULTIDISASSEMBLE_ONE:
@@ -8576,12 +8577,12 @@ void game::butcher()
             break;
         case BUTCHER_CORPSE: {
             butcher_submenu( corpses, indexer_index );
-            u.activity->targets.emplace_back( *corpses[indexer_index] );
+            u.activity->targets.emplace_back( corpses[indexer_index] );
         }
         break;
         case BUTCHER_DISASSEMBLE: {
             // Pick index of first item in the disassembly stack
-            item *const target = *disassembly_stacks[indexer_index].first;
+            item *const target = disassembly_stacks[indexer_index].first;
             crafting::disassemble( u, *target );
         }
         break;
@@ -8590,7 +8591,7 @@ void game::butcher()
                 debugmsg( "null salve_iuse or salvage_tool" );
             } else {
                 // Pick index of first item in the salvage stack
-                item *const target = *salvage_stacks[indexer_index].first;
+                item *const target = salvage_stacks[indexer_index].first;
                 salvage_iuse->cut_up( u, *salvage_tool, *target );
             }
         }
@@ -9321,7 +9322,7 @@ point game::place_player( const tripoint &dest_loc )
                         u.assign_activity( activity_id( "ACT_PULP" ), calendar::INDEFINITELY_LONG, 0 );
                         u.activity->placement = m.getabs( pos );
                         u.activity->auto_resume = true;
-                        u.activity->str_values.push_back( "auto_pulp_no_acid" );
+                        u.activity->str_values.emplace_back( "auto_pulp_no_acid" );
                         return;
                     }
                 }
@@ -9360,7 +9361,8 @@ point game::place_player( const tripoint &dest_loc )
     // Drench the player if swimmable
     if( m.has_flag( "SWIMMABLE", u.pos() ) &&
         !( u.is_mounted() || ( u.in_vehicle && vp1->vehicle().can_float() ) ) ) {
-        u.drench( 40, { { bp_foot_l, bp_foot_r, bp_leg_l, bp_leg_r } }, false );
+        u.drench( 40, { { bodypart_str_id( "foot_l" ), bodypart_str_id( "foot_r" ), bodypart_str_id( "leg_l" ), bodypart_str_id( "leg_r" ) } },
+        false );
     }
 
     // List items here
@@ -9508,7 +9510,8 @@ bool game::phasing_move( const tripoint &dest_loc, const bool via_ramp )
         //add 1 to tunnel distance for each impassable tile in the line
         tunneldist += 1;
         //Being dimensionally anchored prevents quantum shenanigans.
-        if( u.worn_with_flag( "DIMENSIONAL_ANCHOR" ) || u.has_effect_with_flag( "DIMENSIONAL_ANCHOR" ) ) {
+        if( u.worn_with_flag( flag_DIMENSIONAL_ANCHOR ) ||
+            u.has_effect_with_flag( flag_DIMENSIONAL_ANCHOR ) ) {
             u.add_msg_if_player( m_info,
                                  _( "You try to quantum tunnel through the barrier, but something holds you back!" ) );
             return false;
@@ -10039,7 +10042,7 @@ void game::vertical_move( int movez, bool force, bool peeking )
                 add_msg( m_info, _( "You are already underwater!" ) );
                 return;
             }
-            if( u.worn_with_flag( "FLOTATION" ) ) {
+            if( u.worn_with_flag( flag_FLOTATION ) ) {
                 add_msg( m_info, _( "You can't dive while wearing a flotation device." ) );
                 return;
             }
@@ -11609,10 +11612,10 @@ bool check_art_charge_req( item &it )
                 break;
             }
             for( const body_part bp : all_body_parts ) {
-                if( it.covers( bp ) || ( heldweapon && ( bp == bp_hand_r || bp == bp_hand_l ) ) ) {
+                if( it.covers( convert_bp( bp ) ) || ( heldweapon && ( bp == bp_hand_r || bp == bp_hand_l ) ) ) {
                     reqsmet = true;
                     for( auto &i : p.worn ) {
-                        if( i->covers( bp ) && ( &it != i ) && i->get_coverage() > 50 ) {
+                        if( i->covers( convert_bp( bp ) ) && ( &it != i ) && i->get_coverage( convert_bp( bp ) ) > 50 ) {
                             reqsmet = false;
                             break; //This one's no good, check the next body part
                         }
@@ -12033,7 +12036,7 @@ game::Creature_range::Creature_range( game &game_ref ) : u( &game_ref.u, []( pla
     const auto &monsters = game_ref.critter_tracker->get_monsters_list();
     items.insert( items.end(), monsters.begin(), monsters.end() );
     items.insert( items.end(), game_ref.active_npc.begin(), game_ref.active_npc.end() );
-    items.push_back( u );
+    items.emplace_back( u );
 }
 
 game::npc_range::npc_range( game &game_ref )

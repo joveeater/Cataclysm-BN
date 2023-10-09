@@ -31,6 +31,7 @@
 #include "explosion.h"
 #include "field.h"
 #include "field_type.h"
+#include "flag.h"
 #include "game.h"
 #include "game_constants.h"
 #include "gates.h"
@@ -112,8 +113,6 @@ static const efftype_id effect_npc_run_away( "npc_run_away" );
 static const efftype_id effect_onfire( "onfire" );
 static const efftype_id effect_stunned( "stunned" );
 
-static const flag_str_id flag_NO_UNWIELD( "NO_UNWIELD" );
-
 static const itype_id itype_battery( "battery" );
 static const itype_id itype_chem_ethanol( "chem_ethanol" );
 static const itype_id itype_chem_methanol( "chem_methanol" );
@@ -123,8 +122,6 @@ static const itype_id itype_lsd( "lsd" );
 static const itype_id itype_smoxygen_tank( "smoxygen_tank" );
 static const itype_id itype_thorazine( "thorazine" );
 static const itype_id itype_oxygen_tank( "oxygen_tank" );
-
-static const std::string flag_SPLINT( "SPLINT" );
 
 static constexpr float NPC_DANGER_VERY_LOW = 5.0f;
 static constexpr float NPC_DANGER_MAX = 150.0f;
@@ -1223,7 +1220,7 @@ void npc::execute_action( npc_action action )
                     my_spot = priority;
                 }
 
-                seats.push_back( std::make_pair( priority, static_cast<int>( vp.part_index() ) ) );
+                seats.emplace_back( priority, static_cast<int>( vp.part_index() ) );
             }
 
             if( my_spot >= 3 ) {
@@ -1722,7 +1719,7 @@ bool npc::recharge_cbm()
     if( use_bionic_by_id( bio_furnace ) ) {
         const std::function<bool( const item & )> furnace_filter = []( const item & it ) {
             return it.typeId() == itype_id( "withered" ) || it.typeId() == itype_id( "file" ) ||
-                   it.has_flag( "FIREWOOD" );
+                   it.has_flag( flag_FIREWOOD );
         };
         if( consume_cbm_items( furnace_filter ) ) {
             return true;
@@ -2029,7 +2026,7 @@ int npc::confident_shoot_range( const item &it, int recoil ) const
     if( !it.is_gun() ) {
         return res;
     }
-    const auto gun_mode_cmp = []( const std::pair<gun_mode_id, gun_mode> lhs,
+    const auto gun_mode_cmp = []( const std::pair<gun_mode_id, gun_mode> &lhs,
     const std::pair<gun_mode_id, gun_mode> &rhs ) {
         return lhs.second.qty < rhs.second.qty;
     };
@@ -2077,9 +2074,9 @@ int npc::confident_throw_range( const item &thrown, Creature *target ) const
     return static_cast<int>( confident_range );
 }
 
-double item::ideal_ranged_dps( const Character &who, gun_mode &mode ) const
+double item::ideal_ranged_dps( const Character &who, std::optional<gun_mode> &mode ) const
 {
-    if( !is_gun() ) {
+    if( !is_gun() || !mode ) {
         return 0;
     }
     damage_instance gun_damage = this->gun_damage();
@@ -2090,20 +2087,24 @@ double item::ideal_ranged_dps( const Character &who, gun_mode &mode ) const
         itype_id ammo = ammo_default();
         gun_damage.add( ammo->ammo->damage );
     }
-    float damage_factor = gun_damage.total_damage();
-    damage_factor *= mode.qty;
+    int burst_size = mode->qty;
+    if( burst_size <= 0 ) {
+        debugmsg( "gun_mode for %s has burst size of 0", this->tname() );
+        burst_size = 1;
+    }
+    float damage_factor = gun_damage.total_damage() * burst_size;
 
     int move_cost = ranged::time_to_attack( who, *this, nullptr );
     if( ammo_remaining() == 0 ) {
         int reload_cost = get_reload_time() + who.encumb( bp_hand_l ) + who.encumb( bp_hand_r );
         // HACK: Doesn't check how much ammo they'll actually get from the reload. Because we don't know.
         // DPS is less impacted the larger the magazine being swapped.
-        reload_cost /= magazine_integral() ? 1 : ammo_capacity() / mode.qty;
+        reload_cost /= magazine_integral() ? 1 : ammo_capacity() / burst_size;
         move_cost += reload_cost;
     }
     std::vector<ranged::aim_type> aim_types = ranged::get_aim_types( who, *this );
     auto regular = std::find_if( aim_types.begin(),
-    aim_types.end(), []( ranged::aim_type at ) {
+    aim_types.end(), []( const ranged::aim_type & at ) {
         return at.action == std::string( "AIMED_SHOT" );
     } );
     if( regular == aim_types.end() ) {
@@ -3216,7 +3217,7 @@ void npc::drop_items( units::mass drop_weight, units::volume drop_volume, int mi
             }
         }
         if( !added_wgt ) {
-            rWgt.push_back( ratio_index( wgt_ratio, i ) );
+            rWgt.emplace_back( wgt_ratio, i );
         }
         for( size_t j = 0; j < rVol.size() && !added_vol; j++ ) {
             if( vol_ratio > rVol[j].ratio ) {
@@ -3225,7 +3226,7 @@ void npc::drop_items( units::mass drop_weight, units::volume drop_volume, int mi
             }
         }
         if( !added_vol ) {
-            rVol.push_back( ratio_index( vol_ratio, i ) );
+            rVol.emplace_back( vol_ratio, i );
         }
     }
 
@@ -3627,11 +3628,9 @@ bool npc::alt_attack()
     // Remember if we have an item that is dangerous to hold
     bool used_dangerous = false;
 
-    static const std::string danger_string( "NPC_THROW_NOW" );
-    static const std::string alt_string( "NPC_ALT_ATTACK" );
     // TODO: The active bomb with shortest fuse should be thrown first
     const auto check_alt_item = [&used, &used_dangerous, dist, this]( item & it ) {
-        const bool dangerous = it.has_flag( danger_string );
+        const bool dangerous = it.has_flag( flag_NPC_THROW_NOW );
         if( !dangerous && used_dangerous ) {
             return;
         }
@@ -3642,7 +3641,7 @@ bool npc::alt_attack()
         }
 
         // Not alt attack
-        if( !dangerous && !it.has_flag( alt_string ) ) {
+        if( !dangerous && !it.has_flag( flag_NPC_ALT_ATTACK ) ) {
             return;
         }
 
@@ -3677,7 +3676,7 @@ bool npc::alt_attack()
     }
 
     // Are we going to throw this item?
-    if( !used->active && used->has_flag( "NPC_ACTIVATE" ) ) {
+    if( !used->active && used->has_flag( flag_NPC_ACTIVATE ) ) {
         activate_item( weapon_index );
         // Note: intentional lack of return here
         // We want to ignore player-centric rules to avoid carrying live explosives
@@ -3873,7 +3872,7 @@ static float rate_food( const item &it, int want_nutr, int want_quench )
         return 0.0f;
     }
 
-    if( food->parasites && !it.has_flag( "NO_PARASITES" ) ) {
+    if( food->parasites && !it.has_flag( flag_NO_PARASITES ) ) {
         return 0.0;
     }
 
@@ -4168,8 +4167,8 @@ void npc::reach_omt_destination()
             Character &player_character = get_player_character();
             talk_function::assign_guard( *this );
             if( rl_dist( player_character.pos(), pos() ) > SEEX * 2 || !player_character.sees( pos() ) ) {
-                if( player_character.has_item_with_flag( "TWO_WAY_RADIO", true ) &&
-                    has_item_with_flag( "TWO_WAY_RADIO", true ) ) {
+                if( player_character.has_item_with_flag( flag_TWO_WAY_RADIO, true ) &&
+                    has_item_with_flag( flag_TWO_WAY_RADIO, true ) ) {
                     add_msg( m_info, _( "From your two-way radio you hear %s reporting in, "
                                         "'I've arrived, boss!'" ), disp_name() );
                 }
@@ -4728,7 +4727,7 @@ bool npc::adjust_worn()
     const auto covers_broken = [this]( const item & it, side s ) {
         const body_part_set covered = it.get_covered_body_parts( s );
         for( const std::pair<const bodypart_str_id, bodypart> &elem : get_body() ) {
-            if( elem.second.get_hp_cur() <= 0 && covered.test( elem.first->token ) ) {
+            if( elem.second.get_hp_cur() <= 0 && covered.test( elem.first ) ) {
                 return true;
             }
         }

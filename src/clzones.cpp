@@ -6,6 +6,7 @@
 #include <iterator>
 #include <string>
 #include <tuple>
+#include <utility>
 
 #include "avatar.h"
 #include "cata_utility.h"
@@ -25,6 +26,7 @@
 #include "itype.h"
 #include "json.h"
 #include "line.h"
+#include "make_static.h"
 #include "map.h"
 #include "map_iterator.h"
 #include "memory_fast.h"
@@ -38,8 +40,6 @@
 #include "vehicle.h"
 #include "vehicle_part.h"
 #include "vpart_position.h"
-
-static const std::string flag_FIREWOOD( "FIREWOOD" );
 
 static const item_category_id itcat_food( "food" );
 
@@ -301,7 +301,7 @@ plot_options::query_seed_result plot_options::query_seed()
         }
     }
     std::vector<seed_tuple> seed_entries = iexamine::get_seed_entries( seed_inv );
-    seed_entries.emplace( seed_entries.begin(), seed_tuple( itype_id( "null" ), _( "No seed" ), 0 ) );
+    seed_entries.emplace( seed_entries.begin(), itype_id( "null" ), _( "No seed" ), 0 );
 
     int seed_index = iexamine::query_seed( seed_entries );
 
@@ -358,8 +358,8 @@ std::string loot_options::get_zone_name_suggestion() const
 std::vector<std::pair<std::string, std::string>> loot_options::get_descriptions() const
 {
     std::vector<std::pair<std::string, std::string>> options;
-    options.emplace_back( std::make_pair( _( "Loot: Custom: " ),
-                                          !mark.empty() ? mark : _( "No filter" ) ) );
+    options.emplace_back( _( "Loot: Custom: " ),
+                          !mark.empty() ? mark : _( "No filter" ) );
 
     return options;
 }
@@ -421,8 +421,8 @@ std::vector<std::pair<std::string, std::string>> blueprint_options::get_descript
 {
     std::vector<std::pair<std::string, std::string>> options =
                 std::vector<std::pair<std::string, std::string>>();
-    options.emplace_back( std::make_pair( _( "Construct: " ),
-                                          group ? group->name() : _( "No Construction" ) ) );
+    options.emplace_back( _( "Construct: " ),
+                          group ? group->name() : _( "No Construction" ) );
 
     return options;
 }
@@ -431,8 +431,8 @@ std::vector<std::pair<std::string, std::string>> plot_options::get_descriptions(
 {
     auto options = std::vector<std::pair<std::string, std::string>>();
     options.emplace_back(
-        std::make_pair( _( "Plant seed: " ),
-                        !seed.is_empty() ? item::nname( itype_id( seed ) ) : _( "No seed" ) ) );
+        _( "Plant seed: " ),
+        !seed.is_empty() ? item::nname( itype_id( seed ) ) : _( "No seed" ) );
 
     return options;
 }
@@ -854,7 +854,7 @@ zone_type_id zone_manager::get_near_zone_type_for_item( const item &it,
             return zone_LOOT_CUSTOM;
         }
     }
-    if( it.has_flag( flag_FIREWOOD ) ) {
+    if( it.has_flag( STATIC( flag_id( "FIREWOOD" ) ) ) ) {
         if( has_near( zone_LOOT_WOOD, where, range ) ) {
             return zone_LOOT_WOOD;
         }
@@ -974,7 +974,8 @@ void zone_manager::add( const std::string &name, const zone_type_id &type, const
                         const bool invert, const bool enabled, const tripoint &start,
                         const tripoint &end, shared_ptr_fast<zone_options> options )
 {
-    zone_data new_zone = zone_data( name, type, fac, invert, enabled, start, end, options );
+    zone_data new_zone = zone_data( name, type, fac, invert, enabled, start, end,
+                                    std::move( options ) );
     //the start is a vehicle tile with cargo space
     map &here = get_map();
     if( const std::optional<vpart_reference> vp = here.veh_at( here.getlocal(
@@ -1239,7 +1240,7 @@ void zone_manager::zone_edited( zone_data &zone )
             }
         }
         //Add it to the list of changed zones
-        changed_vzones.push_back( std::make_pair( zone_data( zone ), &zone ) );
+        changed_vzones.emplace_back( zone_data( zone ), &zone );
     }
 }
 

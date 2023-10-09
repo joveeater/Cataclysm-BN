@@ -30,6 +30,7 @@
 #include "explosion_queue.h"
 #include "field_type.h"
 #include "flat_set.h"
+#include "flag.h"
 #include "game.h"
 #include "game_constants.h"
 #include "int_id.h"
@@ -74,9 +75,6 @@ static const efftype_id effect_deaf( "deaf" );
 static const efftype_id effect_emp( "emp" );
 static const efftype_id effect_stunned( "stunned" );
 static const efftype_id effect_teleglow( "teleglow" );
-
-static const std::string flag_BLIND( "BLIND" );
-static const std::string flag_FLASH_PROTECTION( "FLASH_PROTECTION" );
 
 static const species_id ROBOT( "ROBOT" );
 
@@ -302,7 +300,7 @@ class ExplosionEvent
         ExplosionEvent( Kind kind, const tripoint position ) :
             kind( kind ), position( position ) {};
         ExplosionEvent( Kind kind, const tripoint position, target_types target ) :
-            kind( kind ), target( target ), position( position ) {};
+            kind( kind ), target( std::move( target ) ), position( position ) {};
 };
 
 class ExplosionProcess
@@ -357,7 +355,7 @@ class ExplosionProcess
             const tripoint blast_center,
             const int blast_power,
             const int blast_radius,
-            const std::optional<projectile> proj = std::nullopt,
+            const std::optional<projectile> &proj = std::nullopt,
             const bool is_fiery = false,
             const std::optional<Creature *> responsible = std::nullopt
         ) : center( blast_center ),
@@ -377,7 +375,7 @@ class ExplosionProcess
         static bool dist_comparator( dist_point_pair a, dist_point_pair b ) {
             return a.first < b.first;
         };
-        static bool time_comparator( time_event_pair a, time_event_pair b ) {
+        static bool time_comparator( const time_event_pair &a, const time_event_pair &b ) {
             return a.first < b.first;
         };
 
@@ -403,9 +401,9 @@ class ExplosionProcess
         void init_event_queue();
         inline float generate_fling_angle( const tripoint from, const tripoint to );
         inline bool is_occluded( const tripoint from, const tripoint to );
-        inline void add_event( const float delay, const ExplosionEvent event ) {
+        inline void add_event( const float delay, const ExplosionEvent &event ) {
             assert( delay >= 0 );
-            event_queue.push( { cur_relative_time + delay + std::numeric_limits<float>::epsilon(), event } );
+            event_queue.emplace( cur_relative_time + delay + std::numeric_limits<float>::epsilon(), event );
         }
         inline bool is_animated() {
             return !test_mode && get_option<int>( "ANIMATION_DELAY" ) > 0;
@@ -455,12 +453,12 @@ void ExplosionProcess::fill_maps()
         // We static_cast<int> in order to keep parity with legacy blasts using rl_dist for distance
         //   which, as stated above, converts trig_dist into int implicitly
         if( blast_radius > 0 && static_cast<int>( z_aware_distance ) <= blast_radius ) {
-            blast_map.push_back( { z_aware_distance, target } );
+            blast_map.emplace_back( z_aware_distance, target );
         }
 
         if( shrapnel && static_cast<int>( distance ) <= shrapnel_range && target.z == center.z &&
             !is_occluded( center, target ) ) {
-            shrapnel_map.push_back( { distance, target } );
+            shrapnel_map.emplace_back( distance, target );
         }
     }
 
@@ -675,7 +673,7 @@ void ExplosionProcess::blast_tile( const tripoint position, const int rl_distanc
             here.smash_items( position, smash_force, cause, true );
             // Don't forget to mark them as explosion smashed already
             for( auto &item : here.i_at( position ) ) {
-                item->set_flag( "EXPLOSION_SMASHED" );
+                item->set_flag( flag_EXPLOSION_SMASHED );
             }
         }
 
@@ -807,7 +805,7 @@ void ExplosionProcess::blast_tile( const tripoint position, const int rl_distanc
                     const bool is_final = amt <= 1;
 
                     // If the item is already propelled, ignore it
-                    if( !is_final && !it->has_flag( "EXPLOSION_PROPELLED" ) ) {
+                    if( !is_final && !it->has_flag( flag_EXPLOSION_PROPELLED ) ) {
                         here.add_item( position, it->split( split_cnt ) );
                     } else {
                         here.add_item( position, std::move( it ) );
@@ -821,7 +819,7 @@ void ExplosionProcess::blast_tile( const tripoint position, const int rl_distanc
         // Now give items velocity
         for( auto &it : here.i_at( position ) ) {
             // If the item is already propelled, ignore it
-            if( it->has_flag( "EXPLOSION_PROPELLED" ) ) {
+            if( it->has_flag( flag_EXPLOSION_PROPELLED ) ) {
                 continue;
             };
 
@@ -842,7 +840,7 @@ void ExplosionProcess::blast_tile( const tripoint position, const int rl_distanc
                 continue;
             }
 
-            it->set_flag( "EXPLOSION_PROPELLED" );
+            it->set_flag( flag_EXPLOSION_PROPELLED );
 
             add_event(
                 one_tile_at_vel( velocity ),
@@ -1024,8 +1022,8 @@ void ExplosionProcess::run()
     for( int z = -OVERMAP_DEPTH; z <= OVERMAP_HEIGHT; z++ ) {
         for( const auto &pos : here.points_on_zlevel( z ) ) {
             for( auto &it : here.i_at( pos ) ) {
-                it->unset_flag( "EXPLOSION_SMASHED" );
-                it->unset_flag( "EXPLOSION_PROPELLED" );
+                it->unset_flag( flag_EXPLOSION_SMASHED );
+                it->unset_flag( flag_EXPLOSION_PROPELLED );
             }
         }
     }
@@ -1186,7 +1184,7 @@ static std::map<const Creature *, int> legacy_shrapnel( const tripoint &src,
         const float z_distance = abs( target.z - blast_center.z );
         const float z_aware_distance = distance + ( Z_LEVEL_DIST - 1 ) * z_distance;
         if( z_aware_distance <= raw_blast_radius ) {
-            blast_map.emplace_back( std::make_pair( z_aware_distance, target ) );
+            blast_map.emplace_back( z_aware_distance, target );
         }
     }
 
@@ -1273,7 +1271,7 @@ static std::map<const Creature *, int> legacy_blast( const tripoint &p, const fl
     open;
     std::set<tripoint> closed;
     std::map<tripoint, float> dist_map;
-    open.push( std::make_pair( 0.0f, p ) );
+    open.emplace( 0.0f, p );
     dist_map[p] = 0.0f;
     // Find all points to blast
     while( !open.empty() ) {
@@ -1328,7 +1326,7 @@ static std::map<const Creature *, int> legacy_blast( const tripoint &p, const fl
             }
 
             if( dist_map.count( dest ) == 0 || dist_map[dest] > next_dist ) {
-                open.push( std::make_pair( next_dist, dest ) );
+                open.emplace( next_dist, dest );
                 dist_map[dest] = next_dist;
             }
         }
@@ -1476,7 +1474,7 @@ void explosion_funcs::regular( const queued_explosion &qe )
     }
 
     const auto print_damage = [&]( const std::pair<const Creature *, int> &pr,
-    std::function<bool( const Creature & )> predicate ) {
+    const std::function<bool( const Creature & )> &predicate ) {
         if( predicate( *pr.first ) && g->u.sees( *pr.first ) ) {
             const Creature *critter = pr.first;
             bool blasted = damaged_by_blast.find( critter ) != damaged_by_blast.end();
@@ -1551,7 +1549,8 @@ void explosion_funcs::flashbang( const queued_explosion &qe )
             } else if( g->u.has_bionic( bio_sunglasses ) ||
                        g->u.is_wearing( itype_rm13_armor_on ) ) {
                 flash_mod = 6;
-            } else if( g->u.worn_with_flag( flag_BLIND ) || g->u.worn_with_flag( flag_FLASH_PROTECTION ) ) {
+            } else if( g->u.worn_with_flag( flag_BLIND ) ||
+                       g->u.worn_with_flag( flag_FLASH_PROTECTION ) ) {
                 flash_mod = 3; // Not really proper flash protection, but better than nothing
             }
             g->u.add_env_effect( effect_blind, bp_eyes, ( 12 - flash_mod - dist ) / 2,
@@ -1751,7 +1750,7 @@ void emp_blast( const tripoint &p )
         //e-handcuffs effects
         item &cuffs = u.primary_weapon();
         if( cuffs.typeId() == itype_e_handcuffs && cuffs.charges > 0 ) {
-            cuffs.unset_flag( "NO_UNWIELD" );
+            cuffs.unset_flag( flag_NO_UNWIELD );
             cuffs.charges = 0;
             cuffs.active = false;
             add_msg( m_good, _( "The %s on your wrists spark briefly, then release your hands!" ),

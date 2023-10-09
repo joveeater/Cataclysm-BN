@@ -35,6 +35,7 @@
 #include "item_contents.h"
 #include "itype.h"
 #include "line.h"
+#include "make_static.h"
 #include "map.h"
 #include "map_iterator.h"
 #include "mapdata.h"
@@ -82,7 +83,6 @@ static const efftype_id effect_teargas( "teargas" );
 static const efftype_id effect_webbed( "webbed" );
 
 static const std::string flag_FUNGUS( "FUNGUS" );
-static const std::string flag_GAS_PROOF( "GAS_PROOF" );
 
 static const trait_id trait_ACIDPROOF( "ACIDPROOF" );
 static const trait_id trait_ELECTRORECEPTORS( "ELECTRORECEPTORS" );
@@ -1357,19 +1357,19 @@ void map::player_in_field( player &u )
                     if( !u.is_on_ground() ) {
                         switch( adjusted_intensity ) {
                             case 3:
-                                parts_burned.push_back( bodypart_id( "hand_l" ) );
-                                parts_burned.push_back( bodypart_id( "hand_r" ) );
-                                parts_burned.push_back( bodypart_id( "arm_l" ) );
-                                parts_burned.push_back( bodypart_id( "arm_r" ) );
+                                parts_burned.emplace_back( "hand_l" );
+                                parts_burned.emplace_back( "hand_r" );
+                                parts_burned.emplace_back( "arm_l" );
+                                parts_burned.emplace_back( "arm_r" );
                             /* fallthrough */
                             case 2:
-                                parts_burned.push_back( bodypart_id( "torso" ) );
+                                parts_burned.emplace_back( "torso" );
                             /* fallthrough */
                             case 1:
-                                parts_burned.push_back( bodypart_id( "foot_l" ) );
-                                parts_burned.push_back( bodypart_id( "foot_r" ) );
-                                parts_burned.push_back( bodypart_id( "leg_l" ) );
-                                parts_burned.push_back( bodypart_id( "leg_r" ) );
+                                parts_burned.emplace_back( "foot_l" );
+                                parts_burned.emplace_back( "foot_r" );
+                                parts_burned.emplace_back( "leg_l" );
+                                parts_burned.emplace_back( "leg_r" );
                         }
                     } else {
                         // Lying in the fire is BAAAD news, hits every body part.
@@ -1501,8 +1501,8 @@ void map::player_in_field( player &u )
                     bodypart_id bp = u.get_random_body_part();
                     int sum_cover = 0;
                     for( const item * const &i : u.worn ) {
-                        if( i->covers( bp->token ) ) {
-                            sum_cover += i->get_coverage();
+                        if( i->covers( bp ) ) {
+                            sum_cover += i->get_coverage( bp );
                         }
                     }
                     // Get stung if [clothing on a body part isn't thick enough (like t-shirt) OR clothing covers less than 100% of body part]
@@ -1535,7 +1535,8 @@ void map::player_in_field( player &u )
             // The gas won't harm you inside a vehicle.
             if( !inside ) {
                 // Full body suits protect you from the effects of the gas.
-                if( !( u.worn_with_flag( flag_GAS_PROOF ) && u.get_env_resist( bodypart_id( "mouth" ) ) >= 15 &&
+                if( !( u.worn_with_flag( STATIC( flag_id( "GAS_PROOF" ) ) ) &&
+                       u.get_env_resist( bodypart_id( "mouth" ) ) >= 15 &&
                        u.get_env_resist( bodypart_id( "eyes" ) ) >= 15 ) ) {
                     const int intensity = cur.get_field_intensity();
                     bool inhaled = u.add_env_effect( effect_poison, bp_mouth, 5, intensity * 1_minutes );
@@ -1940,7 +1941,7 @@ void map::propagate_field( const tripoint &center, const field_type_id &type, in
     using gas_blast = std::pair<float, tripoint>;
     std::priority_queue<gas_blast, std::vector<gas_blast>, pair_greater_cmp_first> open;
     std::set<tripoint> closed;
-    open.push( { 0.0f, center } );
+    open.emplace( 0.0f, center );
 
     const bool not_gas = type.obj().phase != GAS;
 
@@ -1994,7 +1995,7 @@ void map::propagate_field( const tripoint &center, const field_type_id &type, in
                     continue;
                 }
                 if( !obstructed_by_vehicle_rotation( gp.second, pt ) ) {
-                    open.push( { static_cast<float>( rl_dist( center, pt ) ), pt } );
+                    open.emplace( static_cast<float>( rl_dist( center, pt ) ), pt );
                 }
             }
         }

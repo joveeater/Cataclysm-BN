@@ -11,6 +11,7 @@
 #include <set>
 #include <stack>
 #include <unordered_set>
+#include <utility>
 
 #include "avatar.h"
 #include "cata_utility.h"
@@ -25,6 +26,7 @@
 #include "itype.h"
 #include "json.h"
 #include "locations.h"
+#include "make_static.h"
 #include "output.h"
 #include "player.h"
 #include "point.h"
@@ -599,7 +601,7 @@ void requirement_data::reset()
 
 std::vector<std::string> requirement_data::get_folded_components_list( int width, nc_color col,
         const inventory &crafting_inv, const std::function<bool( const item & )> &filter, int batch,
-        std::string hilite, requirement_display_flags flags ) const
+        const std::string &hilite, requirement_display_flags flags ) const
 {
     std::vector<std::string> out_buffer;
     if( components.empty() ) {
@@ -759,7 +761,7 @@ bool requirement_data::has_comps( const inventory &crafting_inv,
 
 bool quality_requirement::has(
     const inventory &crafting_inv, const std::function<bool( const item & )> &, int,
-    cost_adjustment, std::function<void( int )> ) const
+    cost_adjustment, const std::function<void( int )> & ) const
 {
     if( g->u.has_trait( trait_DEBUG_HS ) ) {
         return true;
@@ -794,7 +796,7 @@ bool tool_comp::has(
             charges_required = crafting::charges_for_continuing( charges_required );
         }
 
-        int charges_found = crafting_inv.charges_of( type, charges_required, filter, visitor );
+        int charges_found = crafting_inv.charges_of( type, charges_required, filter, std::move( visitor ) );
         return charges_found == charges_required;
     }
 }
@@ -812,7 +814,7 @@ nc_color tool_comp::get_color( bool has_one, const inventory &crafting_inv,
 
 bool item_comp::has(
     const inventory &crafting_inv, const std::function<bool( const item & )> &filter, int batch,
-    cost_adjustment, std::function<void( int )> ) const
+    cost_adjustment, const std::function<void( int )> & ) const
 {
     if( g->u.has_trait( trait_DEBUG_HS ) ) {
         return true;
@@ -1111,7 +1113,8 @@ requirement_data requirement_data::disassembly_requirements() const
         cov.erase( std::remove_if( cov.begin(), cov.end(),
         []( const item_comp & comp ) {
             //TODO!: Why are we constructing a fresh item exactly?
-            return !comp.recoverable || item::spawn_temporary( comp.type )->has_flag( "UNRECOVERABLE" );
+            return !comp.recoverable ||
+                   item::spawn_temporary( comp.type )->has_flag( STATIC( flag_id( "UNRECOVERABLE" ) ) );
         } ), cov.end() );
         return cov.empty();
     } ), ret.components.end() );

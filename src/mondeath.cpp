@@ -30,6 +30,7 @@
 #include "iuse_actor.h"
 #include "kill_tracker.h"
 #include "line.h"
+#include "make_static.h"
 #include "map.h"
 #include "map_iterator.h"
 #include "mattack_actors.h"
@@ -250,7 +251,7 @@ void mdeath::splatter( monster &z )
                                     z.get_upgrade_time() );
         // Set corpse to damage that aligns with being pulped
         corpse->set_damage( 4000 );
-        corpse->set_flag( "GIBBED" );
+        corpse->set_flag( STATIC( flag_id( "GIBBED" ) ) );
         if( z.has_effect( effect_no_ammo ) ) {
             corpse->set_var( "no_ammo", "no_ammo" );
         }
@@ -772,7 +773,7 @@ void mdeath::jabberwock( monster &z )
     player *ch = dynamic_cast<player *>( z.get_killer() );
 
     bool vorpal = ch && ch->is_player() &&
-                  ch->primary_weapon().has_flag( "DIAMOND" ) &&
+                  ch->primary_weapon().has_flag( STATIC( flag_id( "DIAMOND" ) ) ) &&
                   ch->primary_weapon().volume() > 750_ml;
 
     if( vorpal && !ch->primary_weapon().has_technique( matec_id( "VORPAL" ) ) ) {
@@ -828,15 +829,15 @@ void mdeath::detonate( monster &z )
     std::vector<std::pair<std::string, long>> dets;
     for( const itype_id &bomb_id : pre_dets ) {
         if( bomb_id.str() == "bot_grenade_hack" ) {
-            dets.push_back( std::make_pair( "grenade_act", 5 ) );
+            dets.emplace_back( "grenade_act", 5 );
         } else if( bomb_id.str() == "bot_flashbang_hack" ) {
-            dets.push_back( std::make_pair( "flashbang_act", 5 ) );
+            dets.emplace_back( "flashbang_act", 5 );
         } else if( bomb_id.str() == "bot_gasbomb_hack" ) {
-            dets.push_back( std::make_pair( "gasbomb_act", 20 ) );
+            dets.emplace_back( "gasbomb_act", 20 );
         } else if( bomb_id.str() == "bot_c4_hack" ) {
-            dets.push_back( std::make_pair( "c4armed", 10 ) );
+            dets.emplace_back( "c4armed", 10 );
         } else if( bomb_id.str() == "bot_mininuke_hack" ) {
-            dets.push_back( std::make_pair( "mininuke_act", 20 ) );
+            dets.emplace_back( "mininuke_act", 20 );
         } else {
             // Get the transformation item
             const iuse_transform *actor = dynamic_cast<const iuse_transform *>(
@@ -887,11 +888,11 @@ void mdeath::broken_ammo( monster &z )
 }
 
 static std::vector<detached_ptr<item>> butcher_cbm_item( const itype_id &what,
-                                    const time_point &birthday, const std::vector<std::string> &flags,
+                                    const time_point &birthday, const std::vector<flag_id> &flags,
                                     const std::vector<fault_id> &faults )
 {
     detached_ptr<item> something = item::spawn( what, birthday );
-    for( const std::string &flg : flags ) {
+    for( const flag_id &flg : flags ) {
         something->set_flag( flg );
     }
     for( const fault_id &flt : faults ) {
@@ -903,12 +904,12 @@ static std::vector<detached_ptr<item>> butcher_cbm_item( const itype_id &what,
 }
 
 static std::vector<detached_ptr<item>> butcher_cbm_group( const item_group_id &group,
-                                    const time_point &birthday, const std::vector<std::string> &flags,
+                                    const time_point &birthday, const std::vector<flag_id> &flags,
                                     const std::vector<fault_id> &faults )
 {
     std::vector<detached_ptr<item>> spawned = item_group::items_from( group, birthday );
     for( detached_ptr<item> &it : spawned ) {
-        for( const std::string &flg : flags ) {
+        for( const flag_id &flg : flags ) {
             it->set_flag( flg );
         }
         for( const fault_id &flt : faults ) {

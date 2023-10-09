@@ -47,6 +47,7 @@
 #include "enums.h"
 #include "event.h"
 #include "event_bus.h"
+#include "flag.h"
 #include "field_type.h"
 #include "flat_set.h"
 #include "fungal_effects.h"
@@ -217,29 +218,10 @@ static const bionic_id bio_power_storage_mkII( "bio_power_storage_mkII" );
 static const std::string flag_AUTODOC( "AUTODOC" );
 static const std::string flag_AUTODOC_COUCH( "AUTODOC_COUCH" );
 static const std::string flag_BARRICADABLE_WINDOW_CURTAINS( "BARRICADABLE_WINDOW_CURTAINS" );
-static const std::string flag_CLOSES_PORTAL( "CLOSES_PORTAL" );
 static const std::string flag_CLIMB_SIMPLE( "CLIMB_SIMPLE" );
-static const std::string flag_COOKED( "COOKED" );
-static const std::string flag_DIAMOND( "DIAMOND" );
-static const std::string flag_FERTILIZER( "FERTILIZER" );
-static const std::string flag_FIRE( "FIRE" );
-static const std::string flag_FIRESTARTER( "FIRESTARTER" );
 static const std::string flag_GROWTH_HARVEST( "GROWTH_HARVEST" );
-static const std::string flag_IN_CBM( "IN_CBM" );
-static const std::string flag_NO_CVD( "NO_CVD" );
-static const std::string flag_NO_PACKED( "NO_PACKED" );
-static const std::string flag_NO_STERILE( "NO_STERILE" );
-static const std::string flag_NUTRIENT_OVERRIDE( "NUTRIENT_OVERRIDE" );
 static const std::string flag_OPENCLOSE_INSIDE( "OPENCLOSE_INSIDE" );
-static const std::string flag_PROCESSING( "PROCESSING" );
-static const std::string flag_PROCESSING_RESULT( "PROCESSING_RESULT" );
-static const std::string flag_SAFECRACK( "SAFECRACK" );
-static const std::string flag_SMOKABLE( "SMOKABLE" );
-static const std::string flag_SMOKED( "SMOKED" );
-static const std::string flag_SPLINT( "SPLINT" );
-static const std::string flag_VARSIZE( "VARSIZE" );
 static const std::string flag_WALL( "WALL" );
-static const std::string flag_WRITE_MESSAGE( "WRITE_MESSAGE" );
 
 // @TODO maybe make this a property of the item (depend on volume/type)
 static const time_duration milling_time = 6_hours;
@@ -287,7 +269,7 @@ void iexamine::cvdmachine( player &p, const tripoint & )
     p.invalidate_crafting_inventory();
 
     // Apply flag to item
-    loc->set_flag( "DIAMOND" );
+    loc->set_flag( flag_DIAMOND );
     add_msg( m_good, _( "You apply a diamond coating to your %s" ), loc->type_name() );
     p.mod_moves( -to_turns<int>( 10_seconds ) );
 }
@@ -341,7 +323,7 @@ void iexamine::nanofab( player &p, const tripoint &examp )
     p.invalidate_crafting_inventory();
 
     if( new_item->is_armor() && new_item->has_flag( flag_VARSIZE ) ) {
-        new_item->set_flag( "FIT" );
+        new_item->set_flag( flag_FIT );
     }
 
     here.add_item_or_charges( spawn_point, std::move( new_item ) );
@@ -640,7 +622,7 @@ class atm_menu
                     // the next turn. Putting this here makes sure there will be something to be
                     // done next turn.
                     u.assign_activity( ACT_ATM, 0, transfer_all_money );
-                    u.activity->targets.push_back( dst );
+                    u.activity->targets.emplace_back( dst );
                     break;
                 }
 
@@ -1239,7 +1221,7 @@ void iexamine::pit( player &p, const tripoint &examp )
         return;
     }
     std::vector<item_comp> planks;
-    planks.push_back( item_comp( itype_2x4, 1 ) );
+    planks.emplace_back( itype_2x4, 1 );
 
     map &here = get_map();
     if( query_yn( _( "Place a plank over the pit?" ) ) ) {
@@ -2314,7 +2296,7 @@ void iexamine::harvest_plant( player &p, const tripoint &examp, bool from_activi
     map &here = get_map();
     // Can't use item_stack::only_item() since there might be fertilizer
     map_stack items = here.i_at( examp );
-    const map_stack::iterator seed_it = std::find_if( items.begin(),
+    map_stack::iterator seed_it = std::find_if( items.begin(),
     items.end(), []( const item * const & it ) {
         return it->is_seed();
     } );
@@ -2326,6 +2308,7 @@ void iexamine::harvest_plant( player &p, const tripoint &examp, bool from_activi
         return;
     }
     item *&seed = *seed_it;
+    seed_it = map_stack::iterator();
     const itype_id &seedType = seed->typeId();
     if( seedType == itype_fungal_seeds ) {
         fungus( p, examp );
@@ -2412,7 +2395,7 @@ void iexamine::fertilize_plant( player &p, const tripoint &tile, const itype_id 
     map &here = get_map();
     // Can't use item_stack::only_item() since there might be fertilizer
     map_stack items = here.i_at( tile );
-    const map_stack::iterator seed_it = std::find_if( items.begin(),
+    map_stack::iterator seed_it = std::find_if( items.begin(),
     items.end(), []( const item * const & it ) {
         return it->is_seed();
     } );
@@ -2424,6 +2407,7 @@ void iexamine::fertilize_plant( player &p, const tripoint &tile, const itype_id 
     }
 
     item *&seed = *seed_it;
+    seed_it = map_stack::iterator();
 
     // TODO: item should probably clamp the value on its own
     seed->set_birthday( seed->birthday() - fertilizerEpoch );
@@ -2479,7 +2463,7 @@ void iexamine::aggie_plant( player &p, const tripoint &examp )
     map &here = get_map();
     // Can't use item_stack::only_item() since there might be fertilizer
     map_stack items = here.i_at( examp );
-    const map_stack::iterator seed_it = std::find_if( items.begin(),
+    map_stack::iterator seed_it = std::find_if( items.begin(),
     items.end(), []( const item * const & it ) {
         return it->is_seed();
     } );
@@ -2492,6 +2476,7 @@ void iexamine::aggie_plant( player &p, const tripoint &examp )
     }
 
     const item *const &seed = *seed_it;
+    seed_it = map_stack::iterator();
 
     const std::string pname = seed->get_plant_name();
 
@@ -3482,7 +3467,7 @@ void iexamine::tree_maple( player &p, const tripoint &examp )
     }
 
     std::vector<item_comp> comps;
-    comps.push_back( item_comp( itype_tree_spile, 1 ) );
+    comps.emplace_back( itype_tree_spile, 1 );
     p.consume_items( comps, 1, is_crafting_component );
 
     p.mod_moves( -to_moves<int>( 20_seconds ) );
@@ -3768,11 +3753,12 @@ void iexamine::trap( player &p, const tripoint &examp )
     if( tr.loadid == tr_unfinished_construction || here.partial_con_at( examp ) ) {
         partial_con *pc = here.partial_con_at( examp );
         if( pc ) {
-            if( !character_funcs::can_see_fine_details( p ) && !p.has_trait( trait_DEBUG_HS ) ) {
+            const construction &built = pc->id.obj();
+            if( !character_funcs::can_see_fine_details( p ) && !built.dark_craftable &&
+                !p.has_trait( trait_DEBUG_HS ) ) {
                 add_msg( m_info, _( "It is too dark to construct right now." ) );
                 return;
             }
-            const construction &built = pc->id.obj();
             if( !query_yn( _( "Unfinished task: %s, %d%% complete here, continue construction?" ),
                            built.group->name(), pc->counter / 100000 ) ) {
                 if( query_yn( _( "Cancel construction?" ) ) ) {
@@ -3824,6 +3810,7 @@ void iexamine::clean_water_source( player &, const tripoint &examp )
 std::vector<itype> furn_t::crafting_pseudo_item_types() const
 {
     std::vector<itype> conversion;
+    conversion.reserve( crafting_pseudo_items.size() );
     for( const itype_id &itid : crafting_pseudo_items ) {
         conversion.push_back( *itid );
     }
@@ -4011,7 +3998,7 @@ void iexamine::use_furn_fake_item( player &p, const tripoint &examp )
     const itype &cur_tool = usable_item_types.at( tool_index );
     item &fake_item = *item::spawn_temporary( cur_tool.get_id(), calendar::turn, 0 );
     const itype_id ammo = fake_item.ammo_default();
-    fake_item.set_flag( "PSEUDO" );
+    fake_item.set_flag( flag_PSEUDO );
 
     enum class charges_type {
         grid, ammo_from_map, none
@@ -4020,7 +4007,7 @@ void iexamine::use_furn_fake_item( player &p, const tripoint &examp )
     charges_type charge_type = charges_type::none;
     fake_item.charges = 0;
 
-    if( fake_item.has_flag( "USES_GRID_POWER" ) ) {
+    if( fake_item.has_flag( flag_USES_GRID_POWER ) ) {
         const distribution_grid &grid = get_distribution_grid_tracker().grid_at( abspos );
         fake_item.charges = grid.get_resource();
         charge_type = charges_type::grid;
@@ -4137,7 +4124,7 @@ void iexamine::sign( player &p, const tripoint &examp )
     } );
     tools.reserve( filter.size() );
     for( const item *writing_item : filter ) {
-        tools.push_back( tool_comp( writing_item->typeId(), 1 ) );
+        tools.emplace_back( writing_item->typeId(), 1 );
     }
 
     if( !tools.empty() ) {
@@ -4216,15 +4203,12 @@ std::optional<tripoint> iexamine::getNearFilledGasTank( const tripoint &center, 
 
 static int getGasDiscountCardQuality( const item &it )
 {
-    const auto &tags = it.type->get_flags();
-
-    for( const std::string &tag : tags ) {
-
-        if( tag.size() > 15 && tag.substr( 0, 15 ) == "DISCOUNT_VALUE_" ) {
-            return atoi( tag.substr( 15 ).c_str() );
+    for( const flag_id &tag : it.type->get_flags() ) {
+        int discount_value;
+        if( sscanf( tag->id.c_str(), "DISCOUNT_VALUE_%i", &discount_value ) == 1 ) {
+            return discount_value;
         }
     }
-
     return 0;
 }
 
@@ -4235,7 +4219,7 @@ static int findBestGasDiscount( player &p )
     for( size_t i = 0; i < p.inv_size(); i++ ) {
         item &it = p.inv_find_item( i );
 
-        if( it.has_flag( "GAS_DISCOUNT" ) ) {
+        if( it.has_flag( flag_GAS_DISCOUNT ) ) {
 
             int q = getGasDiscountCardQuality( it );
             if( q > discount ) {
@@ -4879,9 +4863,9 @@ void iexamine::autodoc( player &p, const tripoint &examp )
                 }
                 case 2: {
                     std::vector<std::string> choice_names;
-                    choice_names.push_back( _( "Personality_Override" ) );
+                    choice_names.emplace_back( _( "Personality_Override" ) );
                     for( size_t i = 0; i < 6; i++ ) {
-                        choice_names.push_back( _( "C0RR#PTED?D#TA" ) );
+                        choice_names.emplace_back( _( "C0RR#PTED?D#TA" ) );
                     }
                     int choice_index = uilist( _( "Choose bionic to uninstall" ), choice_names );
                     if( choice_index == 0 ) {
@@ -4974,7 +4958,7 @@ void iexamine::autodoc( player &p, const tripoint &examp )
         } );
         for( const item *anesthesia_item : a_filter ) {
             if( anesthesia_item->ammo_remaining() >= 1 ) {
-                anesth_kit.push_back( tool_comp( anesthesia_item->typeId(), 1 ) );
+                anesth_kit.emplace_back( anesthesia_item->typeId(), 1 );
             }
         }
     }
@@ -5227,9 +5211,9 @@ void iexamine::autodoc( player &p, const tripoint &examp )
                     patient.add_effect( effect_pblue, 1_hours );
                 }
             }
-            if( patient.leak_level( "RADIOACTIVE" ) ) {
+            if( patient.leak_level( flag_RADIOACTIVE ) ) {
                 popup( _( "Warning!  Autodoc detected a radiation leak of %d mSv from items in patient's possession.  Urgent decontamination procedures highly recommended." ),
-                       patient.leak_level( "RADIOACTIVE" ) );
+                       patient.leak_level( flag_RADIOACTIVE ) );
             }
             break;
         }
@@ -5461,8 +5445,8 @@ void iexamine::mill_finalize( player &, const tripoint &examp, const time_point 
             iter = items.erase( iter, &det );
             result->add_component( std::move( det ) );
             // copied from item::inherit_flags, which can not be called here because it requires a recipe.
-            for( const std::string &f : it->type->item_tags ) {
-                if( json_flag::get( f ).craft_inherit() ) {
+            for( const flag_id &f : it->type->get_flags() ) {
+                if( f->craft_inherit() ) {
                     result->set_flag( f );
                 }
             }
@@ -5593,7 +5577,7 @@ static void smoker_load_food( player &p, const tripoint &examp,
                 entries.push_back( smokable_item );
             }
             names.push_back( item::nname( smokable_item->typeId(), 1 ) );
-            comps.push_back( item_comp( smokable_item->typeId(), count ) );
+            comps.emplace_back( smokable_item->typeId(), count );
         }
     }
 
@@ -5642,7 +5626,7 @@ static void smoker_load_food( player &p, const tripoint &examp,
 
     // reload comps with chosen items and quantity
     comps.clear();
-    comps.push_back( item_comp( what->typeId(), amount ) );
+    comps.emplace_back( what->typeId(), amount );
 
     // select from where to get the items from and place them
     inv.form_from_map( g->u.pos(), PICKUP_RANGE, &g->u );
@@ -5702,7 +5686,7 @@ static void mill_load_food( player &p, const tripoint &examp,
                 entries.push_back( millable_item );
             }
             names.push_back( item::nname( millable_item->typeId(), 1 ) );
-            comps.push_back( item_comp( millable_item->typeId(), count ) );
+            comps.emplace_back( millable_item->typeId(), count );
         }
     }
 
@@ -5751,7 +5735,7 @@ static void mill_load_food( player &p, const tripoint &examp,
 
     // reload comps with chosen items and quantity
     comps.clear();
-    comps.push_back( item_comp( what->typeId(), amount ) );
+    comps.emplace_back( what->typeId(), amount );
 
     // select from where to get the items from and place them
     inv.form_from_map( g->u.pos(), PICKUP_RANGE, &g->u );

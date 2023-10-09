@@ -9,7 +9,6 @@
 #include <utility>
 
 #include "avatar.h"
-#include "bodypart.h"
 #include "damage.h"
 #include "flat_set.h"
 #include "init.h"
@@ -17,6 +16,7 @@
 #include "item_factory.h"
 #include "itype.h"
 #include "loading_ui.h"
+#include "make_static.h"
 #include "material.h"
 #include "mod_manager.h"
 #include "npc.h"
@@ -24,18 +24,13 @@
 #include "ranged.h"
 #include "recipe.h"
 #include "recipe_dictionary.h"
-#include "ret_val.h"
 #include "skill.h"
-#include "stomach.h"
 #include "translations.h"
 #include "units.h"
-#include "value_ptr.h"
 #include "veh_type.h"
 #include "vehicle.h"
 #include "vehicle_part.h"
 #include "vitamin.h"
-
-static const std::string flag_VARSIZE( "VARSIZE" );
 
 bool game::dump_stats( const std::string &what, dump_mode mode,
                        const std::vector<std::string> &opts )
@@ -85,14 +80,15 @@ bool game::dump_stats( const std::string &what, dump_mode mode,
         header = {
             "Name", "Encumber (fit)", "Warmth", "Weight", "Storage", "Coverage", "Bash", "Cut", "Bullet", "Acid", "Fire"
         };
-        auto dump = [&rows]( const item & obj ) {
+        body_part bp = opts.empty() ? num_bp : get_body_part_token( opts.front() );
+        auto dump = [&rows, &bp]( const item & obj ) {
             std::vector<std::string> r;
             r.push_back( obj.tname( 1, false ) );
-            r.push_back( std::to_string( obj.get_encumber( g->u ) ) );
+            r.push_back( std::to_string( obj.get_encumber( g->u, convert_bp( bp ).id() ) ) );
             r.push_back( std::to_string( obj.get_warmth() ) );
             r.push_back( std::to_string( to_gram( obj.weight() ) ) );
             r.push_back( std::to_string( obj.get_storage() / units::legacy_volume_factor ) );
-            r.push_back( std::to_string( obj.get_coverage() ) );
+            r.push_back( std::to_string( obj.get_coverage( convert_bp( bp ).id() ) ) );
             r.push_back( std::to_string( obj.bash_resist() ) );
             r.push_back( std::to_string( obj.cut_resist() ) );
             r.push_back( std::to_string( obj.bullet_resist() ) );
@@ -101,14 +97,12 @@ bool game::dump_stats( const std::string &what, dump_mode mode,
             rows.push_back( r );
         };
 
-        body_part bp = opts.empty() ? num_bp : get_body_part_token( opts.front() );
-
         for( const itype *e : item_controller->all() ) {
             if( e->armor ) {
                 item &obj = *item::spawn_temporary( e );
-                if( bp == num_bp || obj.covers( bp ) ) {
-                    if( obj.has_flag( flag_VARSIZE ) ) {
-                        obj.set_flag( "FIT" );
+                if( bp == num_bp || obj.covers( convert_bp( bp ).id() ) ) {
+                    if( obj.has_flag( STATIC( flag_id( "VARSIZE" ) ) ) ) {
+                        obj.set_flag( STATIC( flag_id( "FIT" ) ) );
                     }
                     dump( obj );
                 }

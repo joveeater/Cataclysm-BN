@@ -593,7 +593,7 @@ std::optional<construction_id> construction_menu( const bool blueprint )
                 }
                 current_buffer_location += construct_buffers[i].size();
                 if( i < construct_buffers.size() - 1 ) {
-                    full_construct_buffer.push_back( std::string() );
+                    full_construct_buffer.emplace_back( );
                     current_buffer_location++;
                 }
             }
@@ -976,8 +976,10 @@ bool can_construct( const construction &con, const tripoint &p )
     place_okay &= has_pre_terrain( con, p );
     // see if the flags check out
     place_okay &= std::all_of( con.pre_flags.begin(), con.pre_flags.end(),
-    [&p]( const std::string & flag ) {
-        return get_map().has_flag( flag, p );
+    [&p, &here]( const std::string & flag ) -> bool {
+        const furn_id &furn = here.furn( p );
+        const ter_id &ter = here.ter( p );
+        return furn == f_null ? ter->has_flag( flag ) : furn->has_flag( flag );
     } );
     // make sure the construction would actually do something
     if( !con.post_terrain.is_empty() ) {
@@ -1771,7 +1773,7 @@ void construction::finalize()
             if( !vp.has_flag( flag_INITIAL_PART ) ) {
                 continue;
             }
-            frame_items.push_back( item_comp( vp.item, 1 ) );
+            frame_items.emplace_back( vp.item, 1 );
         }
 
         if( frame_items.empty() ) {

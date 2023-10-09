@@ -8,6 +8,7 @@
 #include "addiction.h"
 #include "calendar.h"
 #include "debug.h"
+#include "flag.h"
 #include "flat_set.h"
 #include "generic_factory.h"
 #include "item.h"
@@ -438,8 +439,8 @@ std::vector<detached_ptr<item>> profession::items( bool male,
         if( it->is_holster() && it->contents.num_item_stacks() == 1 ) {
             clear_faults( it->contents.front() );
         }
-        if( it->has_flag( "VARSIZE" ) ) {
-            it->set_flag( "FIT" );
+        if( it->has_flag( flag_VARSIZE ) ) {
+            it->set_flag( flag_FIT );
         }
     }
 
@@ -603,7 +604,7 @@ void json_item_substitution::load( const JsonObject &jo )
             if( check_duplicate_item( old_it ) ) {
                 sub.throw_error( "Duplicate definition of item" );
             }
-            s.trait_reqs.present.push_back( trait_id( title ) );
+            s.trait_reqs.present.emplace_back( title );
             for( const JsonValue info : sub.get_array( "new" ) ) {
                 s.infos.emplace_back( info );
             }

@@ -45,6 +45,7 @@
 #include "item_group.h"
 #include "itype.h"
 #include "json.h"
+#include "make_static.h"
 #include "map.h"
 #include "map_iterator.h"
 #include "mapbuffer.h"
@@ -103,8 +104,6 @@ static const itype_id itype_plut_cell( "plut_cell" );
 static const itype_id itype_water( "water" );
 static const itype_id itype_water_clean( "water_clean" );
 static const itype_id itype_water_purifier( "water_purifier" );
-
-static const std::string flag_PERPETUAL( "PERPETUAL" );
 
 static bool is_sm_tile_outside( const tripoint &real_global_pos );
 static bool is_sm_tile_over_water( const tripoint &real_global_pos );
@@ -385,7 +384,7 @@ void vehicle::add_steerable_wheels()
                     axle = vp.mount().x;
                 }
 
-                wheels.push_back( std::make_pair( static_cast<int>( vp.part_index() ), steerable_id ) );
+                wheels.emplace_back( static_cast<int>( vp.part_index() ), steerable_id );
             }
         }
     }
@@ -1095,7 +1094,7 @@ bool vehicle::is_perpetual_type( const int e ) const
 {
     const itype_id  &ft = part_info( engines[e] ).fuel_type;
     //TODO!: push up
-    return item::spawn_temporary( ft )->has_flag( "PERPETUAL" );
+    return item::spawn_temporary( ft )->has_flag( flag_PERPETUAL );
 }
 
 bool vehicle::is_engine_on( const int e ) const
@@ -1774,7 +1773,7 @@ bool vehicle::merge_rackable_vehicle( vehicle *carry_veh, const std::vector<int>
     const point mount_zero{};
     if( found_all_parts ) {
         decltype( loot_zones ) new_zones;
-        for( auto carry_map : carry_data ) {
+        for( const auto &carry_map : carry_data ) {
             std::string offset = string_format( "%s%3d", carry_map.old_mount == mount_zero ? axis : " ",
                                                 axis == "X" ? carry_map.old_mount.x : carry_map.old_mount.y );
             std::string unique_id = string_format( "%s%3d%s", offset,
@@ -3420,7 +3419,7 @@ int vehicle::fuel_left( const itype_id &ftype, bool recurse ) const
         }
         // As do any other engine flagged as perpetual
         //TODO!: push up
-    } else if( item::spawn_temporary( ftype )->has_flag( "PERPETUAL" ) ) {
+    } else if( item::spawn_temporary( ftype )->has_flag( flag_PERPETUAL ) ) {
         fl += 10;
     }
 
@@ -3522,7 +3521,7 @@ int vehicle::basic_consumption( const itype_id &ftype ) const
 int vehicle::consumption_per_hour( const itype_id &ftype, int fuel_rate_w ) const
 {
     item &fuel = *item::spawn_temporary( ftype );
-    if( fuel_rate_w == 0 || fuel.has_flag( "PERPETUAL" ) || !engine_on ) {
+    if( fuel_rate_w == 0 || fuel.has_flag( flag_PERPETUAL ) || !engine_on ) {
         return 0;
     }
 
@@ -4869,7 +4868,7 @@ void vehicle::power_parts()
             const int gen_energy_bat = power_to_energy_bat( part_epower_w( elem ), 1_turns );
             if( parts[ elem ].is_unavailable() ) {
                 continue;
-            } else if( parts[ elem ].info().has_flag( flag_PERPETUAL ) ) {
+            } else if( parts[ elem ].info().has_flag( STATIC( std::string( "PERPETUAL" ) ) ) ) {
                 reactor_working = true;
                 delta_energy_bat += std::min( storage_deficit_bat, gen_energy_bat );
             } else if( parts[elem].ammo_remaining() > 0 ) {
@@ -5549,6 +5548,7 @@ void vehicle::place_spawn_items()
                 }
 
                 std::vector<detached_ptr<item>> created;
+                created.reserve( spawn.item_ids.size() );
                 for( const itype_id &e : spawn.item_ids ) {
                     created.emplace_back( item::in_its_container( item::spawn( e ) ) );
                 }

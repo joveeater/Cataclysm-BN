@@ -1,6 +1,7 @@
 #include "monster.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -26,6 +27,7 @@
 #include "itype.h"
 #include "line.h"
 #include "locations.h"
+#include "make_static.h"
 #include "map.h"
 #include "map_iterator.h"
 #include "mapdata.h"
@@ -293,7 +295,7 @@ monster::monster( const monster &source ) : Creature( source ),
     set_anatomy( anatomy_id( "default_anatomy" ) );
 };
 
-monster::monster( monster &&source ) : Creature( std::move( source ) ),
+monster::monster( monster &&source )  noexcept : Creature( std::move( source ) ),
     corpse_components( new monster_component_item_location(
                            this ) ), tied_item( new monster_tied_item_location( this ) ),
     tack_item( new monster_tack_item_location( this ) ),
@@ -2747,17 +2749,16 @@ void monster::drop_items_on_death()
         }
         items = std::move( remaining );
     }
-
-    const auto dropped = g->m.spawn_items( pos(), std::move( items ) );
-
     if( has_flag( MF_FILTHY ) && get_option<bool>( "FILTHY_CLOTHES" ) ) {
-        for( const auto &it : dropped ) {
+        for( const auto &it : items ) {
             if( ( it->is_armor() || it->is_pet_armor() ) && !it->is_gun() ) {
                 // handle wearable guns as a special case
-                it->set_flag( "FILTHY" );
+                it->set_flag( STATIC( flag_id( "FILTHY" ) ) );
             }
         }
     }
+
+    g->m.spawn_items( pos(), std::move( items ) );
 }
 
 void monster::process_one_effect( effect &it, bool is_new )
@@ -2826,7 +2827,7 @@ void monster::process_effects_internal()
             effect &e = get_effect( regeneration_modifier.first );
             regen_multiplier = 1.00 + regeneration_modifier.second.base_modifier +
                                ( e.get_intensity() - 1 ) * regeneration_modifier.second.scale_modifier;
-            regeneration_amount = round( regeneration_amount * regen_multiplier );
+            regeneration_amount = std::round( regeneration_amount * regen_multiplier );
         }
     }
     //Prevent negative regeneration

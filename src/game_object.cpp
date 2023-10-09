@@ -94,6 +94,7 @@ bool game_object<T>::attempt_detach( std::function < detached_ptr<T>
     //Then run the callback.
     detached_ptr<T> n = cb( std::move( orig ) );
 
+
     //There are a bunch of awkwards cases here
     if( !n ) {
         //First the simplest one, we got a null detached_ptr back, we need to remove the object.
@@ -152,11 +153,20 @@ bool game_object<T>::is_loaded() const
 }
 
 template<typename T>
+bool game_object<T>::has_position() const
+{
+    return ( !!loc ) || ( !!saved_loc );
+}
+
+template<typename T>
 tripoint game_object<T>::position( ) const
 {
     if( !loc ) {
-        debugmsg( "position called on [%s] without a position", debug_name() );
-        return tripoint_zero;
+        if( !saved_loc ) {
+            debugmsg( "position called on [%s] without a position", debug_name() );
+            return tripoint_zero;
+        }
+        return saved_loc->position( static_cast<const T *>( this ) );
     }
     return loc->position( static_cast<const T *>( this ) );
 };
