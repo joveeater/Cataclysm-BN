@@ -386,7 +386,6 @@ class cache_reference
     private:
         T *p;
     protected:
-
         using ref_list = std::vector<cache_reference<T>*>;
         using ref_map = std::unordered_map<const T *, ref_list>;
 
@@ -458,9 +457,9 @@ class cache_reference
         cache_reference( cache_reference<T> &&source )  noexcept {
             p = source.p;
             source.p = nullptr;
-            if(!p){
-				return;
-			}
+            if( !p ) {
+                return;
+            }
             ref_map_it search = reference_map.find( p );
             if( search == reference_map.end() ) {
                 debugmsg( "Couldn't find cached reference in reference map." );
