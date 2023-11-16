@@ -109,9 +109,9 @@ class safe_reference
         };
         mutable record *rec;
 
-        inline static rbp_type records_by_pointer;
-        inline static rbi_type records_by_id;
-        inline static uint32_t next_id = 1;
+        static rbp_type records_by_pointer;
+        static rbi_type records_by_id;
+        static uint32_t next_id;
 
         inline void fill( T *obj ) {
             rbp_it search = records_by_pointer.find( obj );
@@ -391,7 +391,7 @@ class cache_reference
 
         using ref_map_it = typename ref_map::iterator;
 
-        inline static ref_map reference_map;
+        static ref_map reference_map;
 
         inline void invalidate() {
             p = nullptr;
@@ -557,5 +557,14 @@ template<typename T>
 void serialize( const safe_reference<T> &, JsonOut & );
 
 void cleanup_references();
+
+template<>
+safe_reference<item>::rbp_type safe_reference<item>::records_by_pointer;
+template<>
+safe_reference<item>::rbi_type safe_reference<item>::records_by_id;
+template<>
+uint32_t safe_reference<item>::next_id;
+template<>
+cache_reference<item>::ref_map cache_reference<item>::reference_map;
 
 #endif // CATA_SRC_SAFE_REFERENCE_H

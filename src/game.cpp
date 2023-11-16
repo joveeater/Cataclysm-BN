@@ -280,6 +280,15 @@ extern bool add_best_key_for_action_to_quick_shortcuts( action_id action,
 extern bool add_key_to_quick_shortcuts( int key, const std::string &category, bool back );
 #endif
 
+template<>
+safe_reference<item>::rbp_type safe_reference<item>::records_by_pointer=safe_reference<item>::rbp_type();
+template<>
+safe_reference<item>::rbi_type safe_reference<item>::records_by_id=safe_reference<item>::rbi_type();
+template<>
+uint32_t safe_reference<item>::next_id = 1;
+template<>
+cache_reference<item>::ref_map cache_reference<item>::reference_map=cache_reference<item>::ref_map();
+
 //The one and only game instance
 std::unique_ptr<game> g;
 
